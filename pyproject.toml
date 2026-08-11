@@ -1,0 +1,25 @@
+[project]
+name = "savvy-selects"
+version = "0.1.0"
+description = "Automated clip triage and review for the Savvy Sounds footage archive"
+requires-python = ">=3.11"
+dependencies = ["anthropic>=0.40", "numpy>=1.26", "pillow>=10.0"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+savvy = "savvy.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["savvy", "savvy.stages", "savvy.review"]
+
+[tool.setuptools.package-data]
+"savvy.review" = ["index.html"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

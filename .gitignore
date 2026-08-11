@@ -1,0 +1,20 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# local config holds absolute paths to your drives
+config.json
+.env
+
+# generated artifacts - never commit footage or the database
+SavvySelects/
+proxies/
+filmstrips/
+SELECTS/
+*.db
+*.mp4
+*.mov
+*.jpg

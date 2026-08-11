@@ -1,0 +1,15 @@
+{
+  "sources": [
+    "/Users/miles/Dropbox/Content by Event",
+    "/Users/miles/Dropbox/CORPORATE",
+    "/Volumes/EXTERNAL/Footage"
+  ],
+  "work_dir": "/Users/miles/SavvySelects",
+  "hwaccel": true,
+  "model": "claude-sonnet-5",
+  "sharpness_floor": 45.0,
+  "scene_threshold": 0.30,
+  "min_clip_seconds": 2.0,
+  "max_clip_seconds": 12.0,
+  "export_vertical": true
+}

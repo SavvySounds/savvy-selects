@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Savvy Review</title>
+<style>
+:root{
+  --ground:#141419; --panel:#1C1C22; --line:#2C2C34;
+  --bone:#E8E4DC; --mute:#7C7C86;
+  --brass:#A08C68; --keep:#7E9B7A; --cut:#9B6A5E;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  background:var(--ground); color:var(--bone);
+  font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  display:flex; flex-direction:column; overflow:hidden;
+}
+.mono{font-family:ui-monospace,"SF Mono",Menlo,monospace}
+.eyebrow{
+  font-size:9px; letter-spacing:2.2px; text-transform:uppercase;
+  color:var(--brass); font-weight:600;
+}
+
+/* ---- top bar ---- */
+header{
+  display:flex; align-items:center; gap:20px;
+  padding:12px 22px; border-bottom:1px solid var(--line); background:var(--panel);
+  flex-shrink:0;
+}
+header .brand{font-size:11px;letter-spacing:3.5px;text-transform:uppercase;font-weight:600}
+header select,header input[type=text]{
+  background:var(--ground); color:var(--bone); border:1px solid var(--line);
+  padding:6px 10px; font-size:12px; border-radius:2px; font-family:inherit;
+}
+header select:focus,header input:focus{outline:2px solid var(--brass);outline-offset:1px}
+.counter{margin-left:auto;font-size:12px;color:var(--mute)}
+.counter b{color:var(--bone)}
+.bar{width:150px;height:3px;background:var(--line);margin-left:14px;position:relative}
+.bar i{position:absolute;inset:0 auto 0 0;background:var(--brass);transition:width .3s}
+
+/* ---- body ---- */
+main{flex:1;display:flex;min-height:0}
+.deck{flex:1;display:flex;flex-direction:column;padding:20px 22px;min-width:0}
+video{
+  flex:1; min-height:0; width:100%; background:#000;
+  border:1px solid var(--line); object-fit:contain;
+}
+
+/* ---- signature: filmstrip scrubber ---- */
+.strip{
+  position:relative; height:80px; margin-top:12px; cursor:pointer;
+  border:1px solid var(--line); background:#000 center/cover no-repeat;
+  flex-shrink:0;
+}
+.strip img{width:100%;height:100%;object-fit:fill;display:block;opacity:.62}
+.strip .head{
+  position:absolute; top:-3px; bottom:-3px; width:2px; background:var(--brass);
+  box-shadow:0 0 9px rgba(160,140,104,.85); pointer-events:none;
+}
+.strip .tc{
+  position:absolute; bottom:5px; left:7px; font-size:10px;
+  background:rgba(20,20,25,.85); padding:2px 6px; letter-spacing:.5px;
+}
+
+/* ---- rating row ---- */
+.rate{display:flex;gap:8px;align-items:center;margin-top:14px;flex-shrink:0}
+.rate button{
+  background:var(--panel); color:var(--bone); border:1px solid var(--line);
+  padding:9px 0; width:48px; font:600 13px/1 inherit; cursor:pointer;
+  border-radius:2px; transition:background .12s,border-color .12s;
+}
+.rate button:hover{border-color:var(--brass)}
+.rate button.on{background:var(--brass);border-color:var(--brass);color:#141419}
+.rate .wide{width:auto;padding:9px 16px}
+.rate .cut.on{background:var(--cut);border-color:var(--cut)}
+.rate .flag.on{background:var(--keep);border-color:var(--keep)}
+.hint{margin-left:auto;font-size:11px;color:var(--mute);letter-spacing:.4px}
+
+/* ---- right rail ---- */
+aside{
+  width:310px; flex-shrink:0; border-left:1px solid var(--line);
+  background:var(--panel); padding:20px; overflow-y:auto;
+}
+aside section{margin-bottom:22px}
+aside h2{font-size:9px;letter-spacing:2.2px;text-transform:uppercase;
+  color:var(--brass);font-weight:600;margin-bottom:8px}
+.big{font-size:26px;font-weight:600;line-height:1}
+.big span{font-size:13px;color:var(--mute);font-weight:400}
+.meta{font-size:12px;color:var(--mute);word-break:break-all;line-height:1.7}
+.meta b{color:var(--bone);font-weight:500}
+.tags{display:flex;flex-wrap:wrap;gap:5px}
+.tag{border:1px solid var(--line);padding:3px 8px;font-size:11px;color:var(--mute)}
+aside input[type=text]{
+  width:100%;background:var(--ground);color:var(--bone);
+  border:1px solid var(--line);padding:8px;font-size:12px;border-radius:2px;
+}
+aside input:focus{outline:2px solid var(--brass);outline-offset:1px}
+
+/* ---- queue ---- */
+.queue{
+  display:flex; gap:6px; padding:10px 22px; border-top:1px solid var(--line);
+  background:var(--panel); overflow-x:auto; flex-shrink:0;
+}
+.qi{
+  flex-shrink:0; width:104px; height:44px; border:1px solid var(--line);
+  position:relative; cursor:pointer; opacity:.5; overflow:hidden;
+}
+.qi img{width:100%;height:100%;object-fit:cover}
+.qi.now{opacity:1;border-color:var(--brass)}
+.qi.done:after{
+  content:""; position:absolute; inset:auto 0 0 0; height:3px; background:var(--keep);
+}
+.empty{margin:auto;text-align:center;color:var(--mute);max-width:340px;padding:40px}
+.empty p{margin-top:10px;font-size:13px}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style></head>
+<body>
+
+<header>
+  <div class="brand">Savvy Review</div>
+  <select id="fEvent"><option value="">All events</option></select>
+  <select id="fState">
+    <option value="todo">Unreviewed</option>
+    <option value="all">Everything</option>
+    <option value="rated">Rated</option>
+    <option value="flagged">Reel crate</option>
+  </select>
+  <select id="fSort">
+    <option value="score">Grader score, high first</option>
+    <option value="event">Event, then time</option>
+    <option value="sharp">Sharpest first</option>
+  </select>
+  <div class="counter"><b id="cDone">0</b> of <b id="cTot">0</b> reviewed
+    <span class="bar"><i id="cBar" style="width:0"></i></span></div>
+</header>
+
+<main>
+  <div class="deck">
+    <video id="vid" autoplay muted playsinline></video>
+    <div class="strip" id="strip">
+      <img id="stripImg" alt="">
+      <div class="head" id="head" style="left:0"></div>
+      <div class="tc mono" id="tc">--:--</div>
+    </div>
+    <div class="rate">
+      <button data-r="1">1</button><button data-r="2">2</button>
+      <button data-r="3">3</button><button data-r="4">4</button>
+      <button data-r="5">5</button>
+      <button class="wide cut" id="bCut">Cut &nbsp;X</button>
+      <button class="wide flag" id="bFlag">Reel crate &nbsp;F</button>
+      <span class="hint">1-5 rate &nbsp;·&nbsp; X cut &nbsp;·&nbsp; F crate &nbsp;·&nbsp; &larr; &rarr; move &nbsp;·&nbsp; space hold</span>
+    </div>
+  </div>
+
+  <aside id="rail"></aside>
+</main>
+
+<div class="queue" id="queue"></div>
+
+<script>
+let clips=[], i=0, loop=null;
+const $=id=>document.getElementById(id);
+const vid=$('vid');
+const tcfmt=s=>`${String(Math.floor(s/60)).padStart(2,'0')}:${String(Math.floor(s%60)).padStart(2,'0')}`;
+
+async function load(){
+  const p=new URLSearchParams({event:$('fEvent').value,state:$('fState').value,sort:$('fSort').value});
+  const d=await (await fetch('/api/clips?'+p)).json();
+  clips=d.clips;
+  $('cTot').textContent=d.total; $('cDone').textContent=d.reviewed;
+  $('cBar').style.width=(d.total?d.reviewed/d.total*100:0)+'%';
+  if($('fEvent').options.length===1)
+    d.events.forEach(e=>$('fEvent').add(new Option(e,e)));
+  i=0; render();
+}
+
+function render(){
+  const q=$('queue'); q.innerHTML='';
+  if(!clips.length){
+    $('rail').innerHTML='';
+    document.querySelector('.deck').innerHTML=
+      '<div class="empty"><div class="eyebrow">Nothing queued</div>'+
+      '<p>No clips match this filter. Switch to Everything, or run '+
+      '<span class="mono">savvy_selects.py score</span> to add more.</p></div>';
+    return;
+  }
+  const c=clips[i];
+  vid.src=`/media/${c.media_id}#t=${c.start}`;
+  vid.currentTime=c.start;
+  vid.play().catch(()=>{});
+  clearInterval(loop);
+  loop=setInterval(()=>{
+    if(vid.currentTime>=c.end||vid.currentTime<c.start-0.5) vid.currentTime=c.start;
+    const p=Math.min(Math.max((vid.currentTime-c.start)/(c.end-c.start),0),1);
+    $('head').style.left=(p*100)+'%';
+    $('tc').textContent=tcfmt(vid.currentTime)+' / '+tcfmt(c.end);
+  },80);
+
+  $('stripImg').src=`/strip/${c.id}.jpg`;
+
+  $('rail').innerHTML=`
+    <section><h2>Grader</h2>
+      <div class="big mono">${c.score??'--'}<span> / 10</span></div>
+      <div class="meta" style="margin-top:6px">${c.note||''}</div></section>
+    <section><h2>Grader tags</h2><div class="tags">
+      ${(c.tags||'').split(',').filter(Boolean).map(t=>`<span class="tag">${t}</span>`).join('')||
+        '<span class="meta">none</span>'}</div></section>
+    <section><h2>Source</h2><div class="meta">
+      <b>${c.event||'—'}</b><br>${c.filename}<br>
+      <span class="mono">${tcfmt(c.start)} – ${tcfmt(c.end)}</span> · ${(c.end-c.start).toFixed(1)}s<br>
+      shot: ${c.shot||'—'}</div></section>
+    <section><h2>Your tags</h2>
+      <input type="text" id="myTags" placeholder="brass hit, wide floor, opener"
+             value="${c.my_tags||''}"></section>`;
+  $('myTags').addEventListener('change',e=>
+    save({my_tags:e.target.value}));
+
+  document.querySelectorAll('.rate [data-r]').forEach(b=>
+    b.classList.toggle('on',+b.dataset.r===c.my_rating));
+  $('bCut').classList.toggle('on',c.my_rating===0);
+  $('bFlag').classList.toggle('on',!!c.flagged);
+
+  clips.forEach((x,n)=>{
+    const d=document.createElement('div');
+    d.className='qi'+(n===i?' now':'')+(x.my_rating!=null?' done':'');
+    d.innerHTML=`<img src="/strip/${x.id}.jpg" loading="lazy">`;
+    d.onclick=()=>{i=n;render()};
+    q.appendChild(d);
+  });
+  q.children[i]?.scrollIntoView({block:'nearest',inline:'center'});
+}
+
+async function save(fields){
+  const c=clips[i];
+  Object.assign(c,fields);
+  await fetch('/api/rate',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({id:c.id,...fields})});
+}
+
+function rate(v){
+  save({my_rating:v}).then(()=>{
+    const n=+$('cDone').textContent+ (clips[i]._counted?0:1);
+    clips[i]._counted=true; $('cDone').textContent=n;
+    $('cBar').style.width=(n/+$('cTot').textContent*100)+'%';
+    if(i<clips.length-1){i++;render()} else render();
+  });
+}
+
+$('strip').onclick=e=>{
+  const c=clips[i], r=e.currentTarget.getBoundingClientRect();
+  vid.currentTime=c.start+(e.clientX-r.left)/r.width*(c.end-c.start);
+};
+document.querySelectorAll('.rate [data-r]').forEach(b=>b.onclick=()=>rate(+b.dataset.r));
+$('bCut').onclick=()=>rate(0);
+$('bFlag').onclick=()=>save({flagged:clips[i].flagged?0:1}).then(render);
+['fEvent','fState','fSort'].forEach(id=>$(id).onchange=load);
+
+addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT'||e.target.tagName==='SELECT'){
+    if(e.key==='Escape') e.target.blur();
+    return;
+  }
+  if(e.key>='1'&&e.key<='5') return rate(+e.key);
+  if(e.key==='x'||e.key==='X') return rate(0);
+  if(e.key==='f'||e.key==='F') return $('bFlag').click();
+  if(e.key==='t'||e.key==='T'){e.preventDefault(); return $('myTags')?.focus()}
+  if(e.key==='ArrowRight'&&i<clips.length-1){i++;render()}
+  if(e.key==='ArrowLeft'&&i>0){i--;render()}
+  if(e.key===' '){e.preventDefault(); vid.paused?vid.play():vid.pause()}
+});
+
+load();
+</script>
+</body></html>
