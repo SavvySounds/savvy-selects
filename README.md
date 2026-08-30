@@ -41,6 +41,8 @@ Twenty dollars of credit covers a first pass at a large archive.
 ## Run
 
 ```bash
+savvy check                      # what's actually on this Mac
+savvy fetch --event "DELTA REEL" # pull one event down from Dropbox
 savvy proxy                      # overnight, free
 savvy scan                       # 1-2 hours, free
 savvy score --limit 200          # the only paid stage
@@ -53,6 +55,40 @@ the same command. `savvy status` shows where things stand.
 
 Start narrow. Point `sources` at one event folder and run all five steps before
 turning it loose on the whole archive.
+
+## Footage that lives in the cloud
+
+Most of a Dropbox folder usually isn't on your Mac. The file shows up in Finder
+with its real size, but the video itself is still on Dropbox's servers. Opening
+one is what makes it download.
+
+That matters here because a full run would quietly pull down everything at once
+and fill your drive overnight while you're asleep.
+
+So nothing downloads unless you say so. `savvy check` shows you, event by event,
+what's on the Mac and what isn't:
+
+```
+event                                on disk   in cloud  files
+OFF ON SUNDAY CONTENT                 2.0 GB    91.2 GB  1/149 local
+DELTA REEL                            1.4 GB        0 B  23/23 local
+```
+
+Anything in the cloud gets parked — indexed so it's counted, but never touched.
+When you want to work on an event, bring it down first:
+
+```bash
+savvy fetch --event "New Balance LA MARATHON"
+savvy fetch --event "SPE HOLIDAY 2025" --dry-run    # just show me the damage
+savvy fetch --max-gb 20                             # stop after 20 GB
+```
+
+`fetch` checks it'll fit before it starts and leaves 5 GB spare. Then run `proxy`
+again and the new footage gets picked up. Work one event at a time, and when
+you're done, set that folder back to online-only in Finder to get the space back.
+
+`export` skips anything whose original has gone back to the cloud and tells you
+which `fetch` command to run.
 
 ## The stages
 

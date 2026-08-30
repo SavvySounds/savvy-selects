@@ -6,7 +6,7 @@ grader's score. Timecodes come from proxies but the pixels come from originals.
 import csv
 from pathlib import Path
 
-from .. import config, media
+from .. import config, media, storage
 
 VERTICAL_VF = "crop=ih*9/16:ih,scale=1080:1920"
 
@@ -45,10 +45,17 @@ def run(cfg, con, args):
     print(f"Exporting {len(rows)} clips at full quality from originals.")
 
     catalog = []
+    in_cloud = []
     for i, row in enumerate(rows, 1):
         src = Path(row["src_path"])
         if not src.exists():
             print(f"  ! source offline, skipping: {src}")
+            continue
+        # A placeholder passes exists(). Cutting one would quietly pull the whole
+        # original down mid-export, which is the thing we are avoiding.
+        if storage.is_cloud_only_path(src):
+            in_cloud.append(row["event"])
+            print(f"  ! original is online-only, skipping: {src.name}")
             continue
 
         rank = row["my_rating"] * 2 if row["my_rating"] else (row["score"] or 0)
@@ -84,3 +91,9 @@ def run(cfg, con, args):
         w.writerows(catalog)
 
     print(f"\nDone. Clips in {out_dir}\nSearchable catalog: {cat_path}")
+
+    if in_cloud:
+        print(f"\n{len(in_cloud)} clips skipped because the original is not on this "
+              f"disk. Bring the event down, then export again:")
+        for event in sorted(set(in_cloud)):
+            print(f"  savvy fetch --event \"{event}\"")

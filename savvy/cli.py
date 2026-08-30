@@ -3,10 +3,10 @@ import argparse
 import shutil
 import sys
 
-from . import config, db
+from . import config, db, storage
 from .review import calibrate as _calibrate
 from .review import serve
-from .stages import export, proxy, scan, score
+from .stages import export, fetch, proxy, scan, score
 
 
 def status(cfg, con, args):
@@ -29,10 +29,57 @@ def status(cfg, con, args):
     if n:
         print(f"\n  {n} Insta360 files parked. Reframe to flat video, re-run proxy.")
 
+    r = con.execute("SELECT COUNT(*) n, SUM(bytes) b FROM media"
+                    " WHERE state='cloud_only'").fetchone()
+    if r["n"]:
+        print(f"\n  {r['n']} files online-only ({storage.human(r['b'] or 0)}), "
+              f"not on this disk.\n  savvy fetch --event \"NAME\" to bring one down.")
+
+
+def check(cfg, con, args):
+    """Read-only: what is actually on this disk versus still in the cloud.
+
+    Never opens a file, so running this cannot trigger a download.
+    """
+    events = storage.survey(cfg["sources"], cfg["video_ext"] + cfg["insta360_ext"])
+    if not events:
+        print("No video found in your sources. Check the paths in config.json.")
+        return
+
+    print(f"{'event':<38} {'on disk':>10} {'in cloud':>10}  files")
+    for e in events:
+        n = e["local_files"] + e["cloud_files"]
+        print(f"{e['event'][:37]:<38} {storage.human(e['local_bytes']):>10}"
+              f" {storage.human(e['cloud_bytes']):>10}"
+              f"  {e['local_files']}/{n} local")
+
+    loc = sum(e["local_bytes"] for e in events)
+    cld = sum(e["cloud_bytes"] for e in events)
+    nloc = sum(e["local_files"] for e in events)
+    ncld = sum(e["cloud_files"] for e in events)
+    free = storage.free_bytes(config.work_dir(cfg))
+
+    print(f"\n{nloc} files on disk ({storage.human(loc)})")
+    print(f"{ncld} files online-only ({storage.human(cld)})")
+    print(f"{storage.human(free)} free on the drive holding {cfg['work_dir']}")
+    if cld > free:
+        print(f"\nPulling all of it down would need {storage.human(cld)} and you "
+              f"have {storage.human(free)}.\nFetch one event at a time:"
+              f"\n  savvy fetch --event \"NAME\"")
+
 
 def build_parser():
     ap = argparse.ArgumentParser(prog="savvy", description=__doc__)
     sub = ap.add_subparsers(dest="cmd", required=True)
+
+    sub.add_parser("check", help="what is on disk vs still in the cloud")
+
+    f = sub.add_parser("fetch", help="download parked online-only files")
+    f.add_argument("--event", help="only this event folder")
+    f.add_argument("--max-gb", type=float, default=0.0,
+                   help="stop after roughly this many GB")
+    f.add_argument("--dry-run", action="store_true",
+                   help="list what would come down, download nothing")
 
     sub.add_parser("proxy", help="index sources and build 720p proxies")
     sub.add_parser("scan", help="split into shots, reject unusable ones locally")
@@ -59,9 +106,9 @@ def build_parser():
     return ap
 
 
-COMMANDS = {"proxy": proxy.run, "scan": scan.run, "score": score.run,
-            "export": export.run, "review": serve, "calibrate": _calibrate,
-            "status": status}
+COMMANDS = {"check": check, "fetch": fetch.run, "proxy": proxy.run,
+            "scan": scan.run, "score": score.run, "export": export.run,
+            "review": serve, "calibrate": _calibrate, "status": status}
 
 
 def main(argv=None):

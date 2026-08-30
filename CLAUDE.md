@@ -32,6 +32,7 @@ sources (Dropbox, external drives)
 savvy/
   config.py          config.json loading, DEFAULTS
   db.py              schema, migrations, state vocabularies
+  storage.py         on-disk vs cloud placeholder, free space, fetch
   media.py           every ffmpeg/PIL call in the codebase
   rubric.py          RUBRIC prompt — this file is the product's taste
   stages/            proxy, scan, score, export
@@ -56,6 +57,13 @@ tests/               pytest, synthetic footage, no API key needed
 4. **`.insv` / `.insp` files are parked, never transcoded.** 360 source is not
    usable video until a human reframes it in Insta360 Studio. They get
    `state='needs_reframe'` and are skipped.
+4b. **Online-only files are parked, never opened.** The archive lives in Dropbox
+   and most of it is not on disk: as measured, 1747 of 1811 files, 770 GB against
+   47 GB free. Opening a placeholder is what makes Dropbox download it, so
+   `proxy` and `export` check `storage.is_cloud_only_path` first and skip. Note
+   `Path.exists()` is TRUE for a placeholder and is not a substitute for this
+   check. Downloads happen only via `savvy fetch`, which is budgeted against free
+   space. Everything in `storage.py` works off `stat()` except `materialize`.
 5. **Byte-range support in `review/server.py` is load-bearing.** Without HTTP 206
    responses the browser cannot seek and the filmstrip scrubber breaks. There is
    a test for this; keep it passing.
@@ -71,6 +79,8 @@ tests/               pytest, synthetic footage, no API key needed
 make setup             # venv + editable install + config.json from example
 make test              # pytest, ~60s, builds synthetic footage with ffmpeg
 
+savvy check            # what is on disk vs still in the cloud, read-only
+savvy fetch --event "DELTA REEL" [--max-gb N] [--dry-run]
 savvy proxy            # overnight on the full archive
 savvy scan             # 1-2 hours
 savvy score --limit 200

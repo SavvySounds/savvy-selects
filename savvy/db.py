@@ -48,7 +48,8 @@ MIGRATIONS = [
     "ALTER TABLE clips ADD COLUMN reviewed_at TEXT",
 ]
 
-MEDIA_STATES = ("found", "proxied", "scanned", "needs_reframe", "missing", "failed")
+MEDIA_STATES = ("found", "proxied", "scanned", "needs_reframe", "cloud_only",
+                "missing", "failed")
 CLIP_STATES = ("candidate", "rejected", "scored", "exported", "error")
 REVIEWABLE = ("candidate", "scored", "exported")
 
