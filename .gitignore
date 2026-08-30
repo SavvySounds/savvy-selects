@@ -1,3 +1,6 @@
+.DS_Store
+**/.DS_Store
+config.json.backup-before-claude
 __pycache__/
 *.py[cod]
 .venv/
@@ -8,7 +11,6 @@ venv/
 # local config holds absolute paths to your drives
 config.json
 .env
-
 # generated artifacts - never commit footage or the database
 SavvySelects/
 proxies/
