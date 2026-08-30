@@ -33,9 +33,11 @@ savvy/
   config.py          config.json loading, DEFAULTS
   db.py              schema, migrations, state vocabularies
   storage.py         on-disk vs cloud placeholder, free space, fetch
+  beatgrid.py        BPM/beat detection and the beat grid
+  edl.py             CMX3600 EDL writer
   media.py           every ffmpeg/PIL call in the codebase
   rubric.py          RUBRIC prompt — this file is the product's taste
-  stages/            proxy, scan, score, export
+  stages/            proxy, scan, score, export, assemble
   review/
     server.py        stdlib HTTP server, JSON + byte-range media API
     index.html       the review deck UI
@@ -72,6 +74,10 @@ tests/               pytest, synthetic footage, no API key needed
 7. **All ffmpeg calls live in `media.py`.** Stages should not shell out directly.
 8. **VideoToolbox is attempted first, libx264 is the fallback.** Apple Silicon
    gets hardware encode; CI and Linux quietly fall back. Never assume either.
+9. **EDL timecodes always reference original sources, never proxies or
+   exported cuts.** `assemble` reads shot ranges off proxies but writes in/out
+   points on the ORIGINAL files at each original's own frame rate, so the EDL
+   relinks cleanly in Premiere/Resolve/Avid.
 
 ## Commands
 
@@ -88,6 +94,7 @@ savvy review           # localhost:8420
 savvy calibrate        # after 20+ human ratings
 savvy export --use-ratings --min-rating 4
 savvy export --crate
+savvy assemble --track "/path/to/track.mp3"  # beat-synced rough cut EDL
 savvy status
 ```
 
@@ -97,8 +104,9 @@ is how the tests and smoke runs stay isolated.
 ## Conventions
 
 - Python 3.11+, standard library first. Current third-party deps are `anthropic`,
-  `numpy`, `pillow` — adding a fourth needs a reason. No OpenCV: the sharpness
-  metric is a hand-rolled Laplacian in numpy specifically to avoid that install.
+  `numpy`, `pillow`, `mutagen` — adding another needs a reason. No OpenCV: the
+  sharpness metric is a hand-rolled Laplacian in numpy specifically to avoid
+  that install.
 - The review UI is one HTML file with inline CSS and vanilla JS. No build step,
   no framework, no npm. Keep it that way.
 - Comments explain *why*, not *what*. Skip the ones that restate the code.
@@ -114,7 +122,7 @@ rubric, re-run `score`. Do not tune it by guessing — use the calibrate output.
 
 ## Backlog
 
-- [ ] `savvy assemble` — beat-synced rough cut from the reel crate. Miles is a DJ
+- [x] `savvy assemble` — beat-synced rough cut from the reel crate. Miles is a DJ
       and will supply the track; detect BPM, cut on the downbeat, output an EDL or
       a Premiere/Resolve-compatible XML rather than a baked render.
 - [ ] Batch the `score` stage — several contact strips per request to cut cost.

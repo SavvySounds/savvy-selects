@@ -6,7 +6,7 @@ import sys
 from . import config, db, storage
 from .review import calibrate as _calibrate
 from .review import serve
-from .stages import export, fetch, proxy, scan, score
+from .stages import assemble, export, fetch, proxy, scan, score
 
 
 def status(cfg, con, args):
@@ -95,6 +95,14 @@ def build_parser():
     e.add_argument("--crate", action="store_true", help="only the reel crate")
     e.add_argument("--limit", type=int, default=0)
 
+    a = sub.add_parser("assemble", help="beat-synced rough cut EDL from the reel crate")
+    a.add_argument("--track", required=True, help="path to the DJ track to cut to")
+    a.add_argument("--bpm", type=float, help="override detected BPM")
+    a.add_argument("--offset", type=float, help="override detected first-beat time, seconds")
+    a.add_argument("--bars", type=int, default=2, help="clip length in bars (4 beats/bar)")
+    a.add_argument("--fps", type=float, default=29.97, help="EDL sequence frame rate")
+    a.add_argument("--out", help="output .edl path (default: work_dir/SELECTS/)")
+
     r = sub.add_parser("review", help="open the local review deck")
     r.add_argument("--port", type=int, default=8420)
     r.add_argument("--no-open", action="store_true")
@@ -108,7 +116,8 @@ def build_parser():
 
 COMMANDS = {"check": check, "fetch": fetch.run, "proxy": proxy.run,
             "scan": scan.run, "score": score.run, "export": export.run,
-            "review": serve, "calibrate": _calibrate, "status": status}
+            "assemble": assemble.run, "review": serve, "calibrate": _calibrate,
+            "status": status}
 
 
 def main(argv=None):

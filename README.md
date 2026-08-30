@@ -48,12 +48,13 @@ savvy scan                       # 1-2 hours, free
 savvy score --limit 200          # the only paid stage
 savvy review                     # rate them yourself
 savvy export --use-ratings --min-rating 4
+savvy assemble --track "/path/to/track.mp3"  # beat-synced rough cut EDL
 ```
 
 Every stage is resumable. Close the laptop, plug the drive back in tomorrow, run
 the same command. `savvy status` shows where things stand.
 
-Start narrow. Point `sources` at one event folder and run all five steps before
+Start narrow. Point `sources` at one event folder and run all six steps before
 turning it loose on the whole archive.
 
 ## Footage that lives in the cloud
@@ -120,6 +121,13 @@ points. A filmstrip under the player scrubs the shot — click any frame to jump
 
 **export** cuts the winners out of the original files at full quality, in 16:9
 and 9:16, and writes `catalog.csv`.
+
+**assemble** is the rough cut. Point it at a DJ track and it reads the BPM from
+the file's tags (or estimates it and says so), walks the beat grid in segments
+of `--bars` bars, and hands each segment the next best clip from your reel
+crate. The output is a CMX3600 EDL — plain text that references your original
+files, importable into Premiere, Resolve, or Avid. No render, no new footage.
+If you know the tempo, `--bpm` and `--offset` skip the guesswork entirely.
 
 ## Output
 

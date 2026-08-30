@@ -20,6 +20,32 @@ def probe_duration(path) -> float:
         return 0.0
 
 
+def probe_fps(path) -> float:
+    """ffprobe r_frame_rate, parsed from the 'num/den' string it returns."""
+    r = run(["ffprobe", "-v", "error", "-select_streams", "v:0",
+             "-show_entries", "stream=r_frame_rate", "-of",
+             "default=nw=1:nk=1", str(path)])
+    try:
+        num, den = r.stdout.strip().split("/")
+        return float(num) / float(den)
+    except (ValueError, ZeroDivisionError):
+        return 0.0
+
+
+def audio_samples(path, sr=11025) -> np.ndarray:
+    """Decode to mono PCM at a low sample rate via ffmpeg, piped to stdout.
+
+    Returned as float32 in [-1, 1]. The low sample rate is plenty for tempo and
+    onset estimation, and keeps the pipe cheap even for a full-length track.
+    """
+    r = subprocess.run(["ffmpeg", "-v", "error", "-i", str(path), "-ac", "1",
+                        "-ar", str(sr), "-f", "s16le", "-"],
+                       capture_output=True)
+    if r.returncode != 0 or not r.stdout:
+        return np.zeros(1, dtype=np.float32)
+    return np.frombuffer(r.stdout, dtype=np.int16).astype(np.float32) / 32768.0
+
+
 def event_name_from(path, sources) -> str:
     """Event label = the folder directly beneath whichever source root matched."""
     p = Path(path)
