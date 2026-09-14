@@ -160,3 +160,67 @@ def cut(src, start, end, out, vf=None, hw=True, bitrate="12000k"):
     r = run(base + ["-c:v", "libx264", "-crf", "18", "-preset", "medium"]
             + tail + [str(out)])
     return r.returncode == 0, r.stderr[-300:]
+
+
+def preview_info(path, timeout=20):
+    """Probe real streams; a suffix or successful ffprobe exit isn't a video."""
+    import json
+    r = run(["ffprobe", "-v", "error", "-show_streams", "-show_format",
+             "-of", "json", str(path)], timeout=timeout)
+    if r.returncode:
+        raise ValueError("Media could not be read")
+    data = json.loads(r.stdout)
+    video = next((s for s in data.get("streams", [])
+                  if s.get("codec_type") == "video"
+                  and not s.get("disposition", {}).get("attached_pic")), None)
+    if not video or not video.get("width") or not video.get("height"):
+        raise ValueError("No playable video or image stream")
+    return {"width": video["width"], "height": video["height"],
+            "duration": float(data.get("format", {}).get("duration", 0) or 0),
+            "has_audio": any(s.get("codec_type") == "audio"
+                             for s in data.get("streams", [])),
+            "codec": video.get("codec_name")}
+
+
+def build_library_video(src, out, max_bytes, timeout=120):
+    """Whole-file, aspect-preserving preview, with actual source audio if any."""
+    import time
+    out = Path(out)
+    if out.exists():
+        raise ValueError("Preview output already exists")
+    deadline = time.monotonic() + timeout
+    # Bound both dimensions, keeping portrait material portrait and avoiding upscaling.
+    vf = "scale=w='min(854,iw)':h='min(480,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2,setsar=1"
+    base = ["ffmpeg", "-v", "error", "-nostdin", "-n", "-threads", "2",
+            "-i", str(src), "-map", "0:v:0", "-map", "0:a:0?", "-vf", vf,
+            "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "96k",
+            "-map_metadata", "-1", "-movflags", "+faststart", "-fs", str(max_bytes)]
+    for codec in (["-c:v", "h264_videotoolbox", "-b:v", "750k"],
+                  ["-c:v", "libx264", "-threads", "2", "-preset", "veryfast", "-crf", "29"]):
+        try:
+            r = run(base + codec + [str(out)], timeout=max(.1, deadline-time.monotonic()))
+            if r.returncode == 0 and out.is_file():
+                return
+        except subprocess.TimeoutExpired:
+            out.unlink(missing_ok=True)
+            raise
+        out.unlink(missing_ok=True)
+    raise ValueError("Preview could not be encoded")
+
+
+def build_library_poster(src, out, *, photo=False, timeout=30):
+    """Make a browser JPEG without modifying the input or adding image metadata."""
+    out = Path(out)
+    if out.exists():
+        raise ValueError("Poster output already exists")
+    base = ["ffmpeg", "-v", "error", "-nostdin", "-n"]
+    if not photo:
+        base += ["-ss", "0"]
+    r = run(base + ["-i", str(src), "-map", "0:v:0", "-frames:v", "1",
+                    "-vf", "scale=w='min(854,iw)':h='min(480,ih)':force_original_aspect_ratio=decrease",
+                    "-q:v", "4", "-map_metadata", "-1", str(out)], timeout=timeout)
+    if r.returncode or not out.is_file():
+        out.unlink(missing_ok=True)
+        raise ValueError("Photo or poster could not be decoded")
+    with Image.open(out) as img:
+        img.verify()

@@ -37,9 +37,7 @@ again.
 
 **Your footage is never written to.** No part of this tool moves, renames,
 deletes, or edits anything inside a folder listed under `sources` in
-`config.json`. The only two things that ever open an original file are the
-final cut in `export` (reads it) and `fetch` (reads it to pull it down from
-Dropbox). Everything else works off the file's name and size only.
+`config.json`. Export, the older proxy stage, and explicitly requested local preview preparation read available originals. Fetch can deliberately download cloud media. The new preview library checks availability first and never downloads cloud-only originals; its archive import reads saved lists only.
 
 **Most of your archive is not on this Mac.** As measured on 2026-08-27:
 
@@ -455,7 +453,7 @@ new writer appears.
 
 | The lasting thing | Who writes it | Verdict |
 |---|---|---|
-| **Your footage** under `sources` | **nobody** | ✅ Clean. Nothing writes, renames or deletes source files. Two places only *read* an original: `media.py:123 cut()` and `storage.py:87 materialize()`. |
+| **Your footage** under `sources` | **nobody** | ✅ Clean. Nothing writes, renames or deletes source files. Export, local proxy/preview preparation, and explicit fetch read originals; no source writer is allowed. |
 | **`config.json`** (your folder paths) | **nobody in the code** — `config.py:31 load()` only reads it | ⚠️ **Violated once, by a tool.** See below. |
 | **`selects.db` → `media` table** | `stages/proxy.py:41,49,59,63,79,86,95,98`; `stages/fetch.py:74,80,92`; `stages/scan.py:19,52` | ⚠️ **Three writers.** Documented, not restructured. |
 | **`selects.db` → `clips` table** | `stages/scan.py:47`; `stages/score.py:39,58,62`; `stages/export.py:73`; `review/server.py:135` | ⚠️ **Four writers**, but cleanly split by column — see below. |
@@ -559,3 +557,65 @@ above has caught a real problem.**
   undo.
 - **Nothing in this tool may ever move, rename or delete anything in your source
   folders.** That isn't a rung on the ladder, it's the floor.
+
+
+## Private preview library — open, watch, and choose
+
+This is the new private viewing room on port 8421. It uses `~/SavvyPreviewLibrary`, separate from the older `~/SavvySelects` review deck and its ratings. Keep, Maybe, and Pass save choices only. Pass does not remove anything.
+
+Open **Open Savvy Preview Library.command** on the Desktop. It opens the same library if already running. If another app owns that address, it leaves that app alone and explains why it stopped. When it starts the library itself, leave its window open while reviewing. No scheduled or overnight task is installed.
+
+### Checks against disposable footage
+
+From this checkout:
+
+```bash
+PYTHONPATH=. /Users/milesdipaola/savvy-selects/.venv/bin/python -m pytest -q tests/test_library_prepare.py tests/test_library.py tests/test_library_launch.py tests/test_one_writer.py
+node tests/test_library_ui_race.cjs
+```
+
+The producer currently has **12 checks**. They cover full recording duration, portrait framing, original audio, silent existing previews, photos, source size/date preservation, online-only refusal, missing and changed sources, 360 companions, shared footage for private viewing, insufficient free space, linked paths, partial-file cleanup, timeouts, and damaged saved previews. The output MP4 check proves the playback header precedes the media data so playback can start promptly. Small synthetic footage is created by the checks; no original career footage is used.
+
+Cloud protection was deliberately removed **only in a disposable copy** after its normal check passed. The same check then failed with `opened protected media`. The working checkout was never broken. This proves the check catches a real attempt to open cloud media; it is not authorization to start downloads.
+
+The launcher has four checks: exact library/workspace identity, reusing the correct running library, refusing another app on the same port, and starting with the correct workspace. Its identity check uses `/api/health`; a server without that check is not silently trusted.
+
+### Saved archive import
+
+The import reads the saved CSV lists; it does not open listed original footage. On a disposable workspace, run:
+
+```bash
+PYTHONPATH=. /Users/milesdipaola/savvy-selects/.venv/bin/python -m savvy.library --workspace /tmp/savvy-library-proof import --inventory '/absolute/path/to/media-inventory.csv'
+```
+
+Use a new disposable folder, and a small synthetic inventory when testing. Confirm items appear with their source and event, originals are not opened, unsupported material remains visible with a clear reason, and repeating the import does not erase Keep/Maybe/Pass choices. Existing previews may be reused only from the specifically approved local preview paths. Their actual audio is checked; a silent old preview is labeled silent rather than described as having original sound.
+
+### Local preview preparation
+
+`prepare_item(workdir, item, dry_run=True)` checks current file metadata and reports availability without opening media or creating output. A normal explicitly requested preparation creates a whole playable preview and poster under that workspace's `previews` folder. The store alone saves the resulting paths and choices.
+
+Check one short local video and one photo first. Confirm the video runs from beginning to end, the sound button reflects actual audio, portrait material stays portrait, the photo opens, and the originals retain their size and modification date. Online-only files must remain online only. RAW photos and native 360 recordings must stay visible without a false ready badge. Shared material may be privately previewed; that does not grant public-use rights. Preview preparation retains a 20 GiB free-space floor and a 5 GiB cache allowance.
+
+### Real viewing soundcheck
+
+1. Open the Desktop launcher and confirm the page says **Preview library** with **Savvy Sounds** underneath. Open it again: it reuses the same library without starting a second one.
+2. Search for a known event. Open a video, press play, then seek near its end. Playback must seek correctly; the server's byte-range check must also pass.
+3. Open a portrait video and a photo. Confirm neither is cropped into a landscape frame. Verify any silent-preview label against the player's actual sound.
+4. Choose Keep, Maybe, and Pass on three review items. Reload; the choices remain. Search and filters must not change those decisions. Confirm Pass changed only the choice, not the original file.
+5. Export the Keeps list. It contains only Keep choices and retains original source references for later editing. It does not copy, move, or delete the footage.
+6. Disconnect a source drive only after ongoing preparation finishes. Already saved previews remain playable; unprepared sources explain that the drive is unavailable.
+7. Trigger preparation once, then click another item before it finishes. The completed result must update the correct item without taking over the newly selected one. The automated browser-function check separately covers a choice saved while a stale reload is in flight.
+
+Final real-preview counts and completed screen checks are recorded by the lead after the bounded seed finishes. Do not treat the archive inventory count as a count of watched or ready clips.
+
+### Checked in the real library — September 14, 2026
+
+The lead completed a full 73-check run in 21.76 seconds before the later launcher checks were added. The actual browser-function race check passed; deliberately removing its guard in isolation caught a stale reload that lost a choice. In the real page, a Keep choice survived reload and the temporary review choice was then reset. A video played through 17 seconds with audio present. At 390-pixel width in the light appearance, the page had no horizontal overflow. An empty search and Clear restored the results. The bounded preview seed was still running when these checks were recorded; this paragraph makes no final ready-count claim.
+
+### Canceling a preview during playback
+
+Observed September 14, 2026: moving to another clip closed the video connection; the server attempted a second error response after already starting the video response. The regression check `tests/test_library.py::test_stream_disconnect_never_sends_second_response` reproduced all three failure forms (broken pipe, reset connection, and a later stream read/write error) before the fix. All three now close the connection without another response. Run `python -m pytest tests/test_library.py tests/test_one_writer.py -q`, then play a preview and switch clips several times; the server should remain usable without repeated disconnect tracebacks. These checks use throwaway preview bytes, not original footage.
+
+### Final attended handoff — September 14, 2026
+
+54 ready:23 reused Delta videos plus31 newly prepared local videos/photos. All31 original sizes and modification dates independently matched the pre-preview first-look record. New cache38.5MB; no cloud download, source writes, or deletion. All temporary UI choices reset to Unreviewed. Real Make preview button completed the54th item; native player reached readyState4. Photo decoded360x480; Maybe→Pass→Undo restored Maybe, then reset. Desktop launcher tested both existing-server reuse and fresh start. Final affected checks31passed2.39s after streaming fix; full earlier suite73passed. Browser load of20,959 records measured0.45s. Desktop dark and390px light reviewed; narrow viewport reset. Other clouds remain outside this catalog. Long encodes are bounded to120seconds and can return an actionable error. This is attended preview work, no scheduled processing.

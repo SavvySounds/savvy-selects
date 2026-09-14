@@ -176,3 +176,14 @@ make test
 
 Builds synthetic footage with ffmpeg and runs the pipeline end to end. No API key,
 no network.
+
+
+## Your private footage library
+
+Double-click **Open Savvy Preview Library.command** on the Desktop to open the new viewing room. Keep its window open while reviewing. Opening it again brings you back to the same library.
+
+Search by event, watch the available videos, and open photos. Choose **Keep**, **Maybe**, or **Pass** as you go. Your choices stay saved; Pass never deletes a file. Export the Keeps list when you want a shortlist for editing.
+
+Previews live separately in `~/SavvyPreviewLibrary`; your original footage and the older review deck stay intact. Ready previews can play even when the source drive is disconnected. Material that still needs a preview explains what is missing. Existing silent previews are labeled honestly, and 360 recordings stay available for a later framing pass.
+
+This library is private. Previewing shared footage does not mean it is cleared for posting. Nothing here uploads footage, posts to social media, downloads online-only originals, or runs on a schedule.

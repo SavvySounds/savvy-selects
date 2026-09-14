@@ -15,6 +15,8 @@ PKG = Path(__file__).resolve().parent.parent / "savvy"
 
 # Who is allowed to write each table. Adding a name here should be a decision.
 ALLOWED_WRITERS = {
+    "library_items": {"library/store.py"},
+    "library_choices": {"library/store.py"},
     # media.state has three writers today. That is a real boundary violation,
     # written down in VERIFY.md rather than restructured. Pinning it here means
     # a FOURTH one cannot appear quietly.
@@ -97,3 +99,9 @@ def test_nothing_in_the_package_writes_config_json():
                      r"open\(\s*config_path\(\)\s*,\s*['\"][wa]", text):
             offenders.append(p.relative_to(PKG).as_posix())
     assert not offenders, f"these write config.json: {offenders}"
+
+
+def test_library_values_have_exactly_one_writer():
+    found = actual_writers()
+    for table in ("library_items", "library_choices"):
+        assert found.get(table) == {"library/store.py"}
