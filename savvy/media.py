@@ -165,6 +165,8 @@ def cut(src, start, end, out, vf=None, hw=True, bitrate="12000k"):
 def preview_info(path, timeout=20):
     """Probe real streams; a suffix or successful ffprobe exit isn't a video."""
     import json
+    if Path(path).suffix.lower() in {".heic", ".heif"}:
+        return _heic_info(path, timeout)
     r = run(["ffprobe", "-v", "error", "-show_streams", "-show_format",
              "-of", "json", str(path)], timeout=timeout)
     if r.returncode:
@@ -213,6 +215,9 @@ def build_library_poster(src, out, *, photo=False, timeout=30):
     out = Path(out)
     if out.exists():
         raise ValueError("Poster output already exists")
+    if photo and Path(src).suffix.lower() in {".heic", ".heif"}:
+        _heic_poster(src, out, timeout)
+        return
     base = ["ffmpeg", "-v", "error", "-nostdin", "-n"]
     if not photo:
         base += ["-ss", "0"]
@@ -224,3 +229,50 @@ def build_library_poster(src, out, *, photo=False, timeout=30):
         raise ValueError("Photo or poster could not be decoded")
     with Image.open(out) as img:
         img.verify()
+
+
+def _local_photo(path):
+    import stat
+    from . import storage
+    path = Path(path).absolute()
+    if any(p.is_symlink() for p in (path, *path.parents)):
+        raise ValueError("Linked photo paths are not allowed")
+    st = path.lstat()
+    if not stat.S_ISREG(st.st_mode) or not st.st_size or storage.is_cloud_only(st):
+        raise ValueError("Photo is unavailable locally; no download started")
+    return st.st_size, st.st_mtime_ns, st.st_dev, st.st_ino
+
+
+def _heic_info(path, timeout):
+    import re
+    before = _local_photo(path)
+    result = run(["/usr/bin/sips", "-g", "pixelWidth", "-g", "pixelHeight", str(path)], timeout=timeout)
+    values = dict(re.findall(r"(pixelWidth|pixelHeight):\s*(\d+)", result.stdout))
+    if result.returncode or len(values) != 2 or _local_photo(path) != before:
+        raise ValueError("Could not read the complete HEIC image dimensions")
+    width, height = int(values['pixelWidth']), int(values['pixelHeight'])
+    if min(width, height) <= 0:
+        raise ValueError("HEIC image has no usable dimensions")
+    return {'width': width, 'height': height, 'duration': 0.0,
+            'has_audio': False, 'codec': 'heic-primary-image'}
+
+
+def _heic_poster(src, out, timeout):
+    import tempfile
+    from PIL import ImageOps
+    before = _local_photo(src)
+    # HEIC can expose many tiles as video streams. ImageIO via sips assembles the
+    # primary image; ffmpeg's first stream can successfully decode only one tile.
+    with tempfile.TemporaryDirectory(prefix='.heic-', dir=Path(out).parent) as tmp:
+        jpeg = Path(tmp) / 'primary.jpg'
+        result = run(['/usr/bin/sips', '-s', 'format', 'jpeg', str(src), '--out', str(jpeg)], timeout=timeout)
+        if result.returncode or not jpeg.is_file() or _local_photo(src) != before:
+            raise ValueError('HEIC conversion failed or source changed')
+        with Image.open(jpeg) as full:
+            img = ImageOps.exif_transpose(full).convert('RGB')
+            img.thumbnail((854, 480), Image.Resampling.LANCZOS)
+            with Path(out).open('xb') as target:
+                img.save(target, format='JPEG', quality=88)
+    if _local_photo(src) != before:
+        Path(out).unlink(missing_ok=True)
+        raise ValueError('Photo changed during preview preparation')
