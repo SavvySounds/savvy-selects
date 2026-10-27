@@ -291,8 +291,9 @@ archive dies before anything costs money.
 ## `savvy score` — the only step that costs money
 
 **What it is.** Builds a three-frame strip per surviving shot and has Claude
-grade it against the rubric in `savvy/rubric.py`. This is the one stage that
-sends anything off the Mac, and the only one that spends money.
+grade it against the rubric in `savvy/rubric.py`. This is the only stage that
+sends pictures off the Mac, and where nearly all the money goes. (`captions --api`
+can also spend, text only.)
 
 **How to run it.**
 
@@ -414,6 +415,46 @@ name puts the best material on top.
    look like full-quality footage, not soft 720p. If they look like the small
    copies, export is reading the wrong files and the whole point of the tool is
    gone.
+
+---
+
+## `savvy captions` — Instagram copy per event
+
+**What it is.** Writes one prompt per event asking for hooks, a shot order with
+on-screen text, three captions, hashtags and a fifteen-second ad cut, in the
+voice written down in `savvy/voice.py`. By default it calls nothing and costs
+nothing: Miles pastes a prompt into an AI he already pays for, or has Claude
+Code or Codex work through the folder. Prompts land in
+`~/SavvySelects/SELECTS/CAPTIONS/prompts`. `--api` sends them to Claude
+instead and saves the copy, billed to a separate API key.
+
+**How to run it.**
+
+```bash
+.venv/bin/savvy captions --use-ratings --min-rating 4
+.venv/bin/savvy captions --use-ratings --min-rating 4 --event "DELTA REEL" --api   # paid
+```
+
+**Proving it works.**
+
+1. Run it without `--api`. One `.txt` per event appears and nothing else.
+   Open one: the brand voice, then the shot list. There must be no `/Users/`
+   path and no filename in it, only shot numbers, tags, notes and ratings.
+2. **Sanity check against physical reality.** Paste one prompt into Claude.
+   Pick two shot numbers from its shot order and open the exported clips whose
+   filenames end in those numbers. The on-screen text must fit what is actually
+   on screen. If it describes things that aren't there, tighten the NEVER list
+   in `savvy/voice.py`.
+3. With `--api` and no key set, it must refuse: `Set ANTHROPIC_API_KEY first.`
+   Run it twice on one `--event`: the second run must print
+   `have DELTA REEL.md, skipping` and spend nothing.
+4. Offline tests cover the rest: no paths in a prompt, Miles's rating and tags
+   included, an errored clip's API error left out, prompts refreshed with new
+   ratings, `--api` sending exactly what the prompt file holds, a refusal
+   writing nothing (`tests/test_captions.py`).
+
+**Not proven automatically.** The quality of the writing. That's step 2, and
+it's a human one.
 
 ---
 
@@ -549,6 +590,8 @@ above has caught a real problem.**
 
 - `score` spends money and is never scheduled. It runs with `--limit`, watched,
   every time.
+- `captions` is free by default. `captions --api` spends money, about a dime
+  per event, and runs on one `--event`, watched.
 - `fetch` downloads footage onto a drive with 28 GB free. It runs with
   `--dry-run` first, watched, every time.
 - `export` writes clips and reads originals. It runs watched until rung 3 is

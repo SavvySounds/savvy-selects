@@ -6,7 +6,7 @@ import sys
 from . import config, db, storage
 from .review import calibrate as _calibrate
 from .review import serve
-from .stages import assemble, export, fetch, proxy, scan, score
+from .stages import assemble, captions, export, fetch, proxy, scan, score
 
 
 def status(cfg, con, args):
@@ -103,6 +103,18 @@ def build_parser():
     a.add_argument("--fps", type=float, default=29.97, help="EDL sequence frame rate")
     a.add_argument("--out", help="output .edl path (default: work_dir/SELECTS/)")
 
+    cp = sub.add_parser("captions", help="write an Instagram copy prompt per event (free)")
+    cp.add_argument("--min-score", type=int, default=7)
+    cp.add_argument("--use-ratings", action="store_true",
+                    help="use your review ratings instead of the grader's score")
+    cp.add_argument("--min-rating", type=int, default=4)
+    cp.add_argument("--crate", action="store_true", help="only the reel crate")
+    cp.add_argument("--event", help="only this event")
+    cp.add_argument("--api", action="store_true",
+                    help="send the prompts to Claude and save the copy (paid API key)")
+    cp.add_argument("--force", action="store_true",
+                    help="with --api, redo events that already have copy")
+
     r = sub.add_parser("review", help="open the local review deck")
     r.add_argument("--port", type=int, default=8420)
     r.add_argument("--no-open", action="store_true")
@@ -116,8 +128,8 @@ def build_parser():
 
 COMMANDS = {"check": check, "fetch": fetch.run, "proxy": proxy.run,
             "scan": scan.run, "score": score.run, "export": export.run,
-            "assemble": assemble.run, "review": serve, "calibrate": _calibrate,
-            "status": status}
+            "assemble": assemble.run, "captions": captions.run, "review": serve,
+            "calibrate": _calibrate, "status": status}
 
 
 def main(argv=None):

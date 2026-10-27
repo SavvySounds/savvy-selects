@@ -49,6 +49,7 @@ savvy score --limit 200          # the only paid stage
 savvy review                     # rate them yourself
 savvy export --use-ratings --min-rating 4
 savvy assemble --track "/path/to/track.mp3"  # beat-synced rough cut EDL
+savvy captions --use-ratings --min-rating 4  # Instagram copy prompts, free
 ```
 
 Every stage is resumable. Close the laptop, plug the drive back in tomorrow, run
@@ -129,6 +130,20 @@ crate. The output is a CMX3600 EDL — plain text that references your original
 files, importable into Premiere, Resolve, or Avid. No render, no new footage.
 If you know the tempo, `--bpm` and `--offset` skip the guesswork entirely.
 
+**captions** writes one prompt per event for the Instagram copy: five hooks
+and a pick, a shot order with on-screen text, three captions (story, proof,
+point of view), hashtags, and a fifteen-second ad cut. It doesn't call any AI
+and costs nothing. Paste a prompt into Claude or ChatGPT, or ask Claude Code or
+Codex to work through the folder and save the copy next to it. The prompts hold
+only the event name and the tags, notes and ratings already in the database, so
+no drive needs to be mounted and no footage goes anywhere. Give it the same
+flags you exported with and the copy matches the clips you cut. Shot numbers
+match the end of each exported clip's filename. The voice lives in
+`savvy/voice.py`; edit it like a copywriter's brief.
+
+If you'd rather it write the copy itself, `--api` sends the same prompts to
+Claude using a separate, pay-per-use API key (about a dime per event).
+
 ## Output
 
 ```
@@ -136,6 +151,7 @@ If you know the tempo, `--bpm` and `--offset` skip the guesswork entirely.
     16x9/         10_DELTA_REEL_00341.mp4     <- filename leads with the rating
     9x16/         10_DELTA_REEL_00341.mp4
     catalog.csv   your rating, grader score, tags, source file, timecode
+    CAPTIONS/     prompts/DELTA REEL.txt      <- paste into Claude for the copy
 ```
 
 Sort by name and the best material is at the top. The CSV makes the whole archive
