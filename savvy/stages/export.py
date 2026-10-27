@@ -31,13 +31,6 @@ def _safe(text, limit=40):
                    for ch in (text or "misc"))[:limit].strip()
 
 
-def clip_stem(row):
-    """Filename stem for a cut. Your stars, doubled onto the grader's 0-10
-    scale, outrank its score so sorting by name puts your picks on top."""
-    rank = row["my_rating"] * 2 if row["my_rating"] else (row["score"] or 0)
-    return f"{rank:02d}_{_safe(row['event'])}_{row['id']:05d}"
-
-
 def run(cfg, con, args):
     out_dir = config.work_dir(cfg) / "SELECTS"
     (out_dir / "16x9").mkdir(parents=True, exist_ok=True)
@@ -65,7 +58,8 @@ def run(cfg, con, args):
             print(f"  ! original is online-only, skipping: {src.name}")
             continue
 
-        stem = clip_stem(row)
+        rank = row["my_rating"] * 2 if row["my_rating"] else (row["score"] or 0)
+        stem = f"{rank:02d}_{_safe(row['event'])}_{row['id']:05d}"
 
         wide = out_dir / "16x9" / f"{stem}.mp4"
         ok, err = media.cut(src, row["start"], row["end"], wide, hw=cfg["hwaccel"])

@@ -292,8 +292,8 @@ archive dies before anything costs money.
 
 **What it is.** Builds a three-frame strip per surviving shot and has Claude
 grade it against the rubric in `savvy/rubric.py`. This is the only stage that
-sends pictures off the Mac, and where nearly all the money goes. (`captions`
-is the other paid stage; it sends text only.)
+sends pictures off the Mac, and where nearly all the money goes. (`captions --api`
+can also spend, text only.)
 
 **How to run it.**
 
@@ -420,37 +420,41 @@ name puts the best material on top.
 
 ## `savvy captions` — Instagram copy per event
 
-**What it is.** Drafts hooks, a shot order with on-screen text, three captions,
-hashtags and a fifteen-second ad cut for each event, in the voice written down
-in `savvy/voice.py`. It sends Claude the event name and the tags, notes and
-ratings already in the database. No footage, no file paths. One markdown file
-per event in `~/SavvySelects/SELECTS/CAPTIONS`.
+**What it is.** Writes one prompt per event asking for hooks, a shot order with
+on-screen text, three captions, hashtags and a fifteen-second ad cut, in the
+voice written down in `savvy/voice.py`. By default it calls nothing and costs
+nothing: Miles pastes a prompt into an AI he already pays for, or has Claude
+Code or Codex work through the folder. Prompts land in
+`~/SavvySelects/SELECTS/CAPTIONS/prompts`. `--api` sends them to Claude
+instead and saves the copy, billed to a separate API key.
 
 **How to run it.**
 
 ```bash
-.venv/bin/savvy captions --use-ratings --min-rating 4 --dry-run
-.venv/bin/savvy captions --use-ratings --min-rating 4 --event "DELTA REEL"
+.venv/bin/savvy captions --use-ratings --min-rating 4
+.venv/bin/savvy captions --use-ratings --min-rating 4 --event "DELTA REEL" --api   # paid
 ```
 
 **Proving it works.**
 
-1. **Dry run first, every time.** `--dry-run` prints the exact text that would
-   be sent for each event and ends `nothing sent`. Read it: there must be no
-   `/Users/` path and no filename in it, only ids, tags, notes and ratings.
-2. With no key set, a real run must refuse: `Set ANTHROPIC_API_KEY first.`
-3. Run one event with `--event`. One new `.md` appears. Run the same command
-   again: it must print `have DELTA REEL.md, skipping` and spend nothing.
-4. **Sanity check against physical reality.** Pick two ids from the file's
-   shot order, find them in the shot key, open those exported clips. The
-   on-screen text must fit what is actually on screen. If it describes things
-   that aren't there, tighten the NEVER list in `savvy/voice.py`.
-5. Offline tests cover the rest: no paths leave the machine, Miles's rating
-   and tags are sent, an errored clip's API error is not, a refusal writes
-   nothing so the next run retries (`tests/test_captions.py`).
+1. Run it without `--api`. One `.txt` per event appears and nothing else.
+   Open one: the brand voice, then the shot list. There must be no `/Users/`
+   path and no filename in it, only shot numbers, tags, notes and ratings.
+2. **Sanity check against physical reality.** Paste one prompt into Claude.
+   Pick two shot numbers from its shot order and open the exported clips whose
+   filenames end in those numbers. The on-screen text must fit what is actually
+   on screen. If it describes things that aren't there, tighten the NEVER list
+   in `savvy/voice.py`.
+3. With `--api` and no key set, it must refuse: `Set ANTHROPIC_API_KEY first.`
+   Run it twice on one `--event`: the second run must print
+   `have DELTA REEL.md, skipping` and spend nothing.
+4. Offline tests cover the rest: no paths in a prompt, Miles's rating and tags
+   included, an errored clip's API error left out, prompts refreshed with new
+   ratings, `--api` sending exactly what the prompt file holds, a refusal
+   writing nothing (`tests/test_captions.py`).
 
-**Not proven automatically.** The live call and the quality of the writing.
-Both are the step 3 and 4 checks above, and they're human ones.
+**Not proven automatically.** The quality of the writing. That's step 2, and
+it's a human one.
 
 ---
 
@@ -586,8 +590,8 @@ above has caught a real problem.**
 
 - `score` spends money and is never scheduled. It runs with `--limit`, watched,
   every time.
-- `captions` spends money too, a few cents per event. `--dry-run` first, then
-  one `--event`, watched.
+- `captions` is free by default. `captions --api` spends money, about a dime
+  per event, and runs on one `--event`, watched.
 - `fetch` downloads footage onto a drive with 28 GB free. It runs with
   `--dry-run` first, watched, every time.
 - `export` writes clips and reads originals. It runs watched until rung 3 is

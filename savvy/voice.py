@@ -2,7 +2,7 @@
 
 rubric.py is what the company looks for in footage; this file is how it talks
 about it. Edit it the way you would brief a copywriter, then re-run
-`savvy captions --event "NAME" --force` on one event to hear the difference.
+`savvy captions --event "NAME"` and try the new prompt on one event.
 """
 
 VOICE = """You write Instagram copy for Savvy Sounds Collective, a DJ and

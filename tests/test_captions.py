@@ -1,4 +1,4 @@
-"""captions: per-event copy drafted from the database. No API key, no network.
+"""captions: per-event copy prompts built from the database. No API key, no network.
 
 No footage either. The stage only reads tags, notes and ratings, so these tests
 seed the database directly - which is itself the point: if captions ever needed
@@ -37,12 +37,12 @@ class FakeClient:
 class NoCalls:
     @property
     def messages(self):
-        raise AssertionError("a dry run must never reach the API")
+        raise AssertionError("without --api nothing may reach the API")
 
 
 def ns(**kw):
     base = dict(crate=False, use_ratings=True, min_rating=4, min_score=7,
-                event=None, force=False, dry_run=False)
+                event=None, api=False, force=False)
     base.update(kw)
     return argparse.Namespace(**base)
 
@@ -78,81 +78,96 @@ def _out(cfg):
     return Path(cfg["work_dir"]) / "SELECTS" / "CAPTIONS"
 
 
-def test_one_file_per_event_with_a_shot_key(env):
+# -- default: free, writes prompts, calls nothing ---------------------------
+
+
+def test_default_writes_one_prompt_per_event_and_calls_nothing(env):
     cfg, con = env
-    fake = FakeClient()
-    captions.run(cfg, con, ns(), client=fake)
+    captions.run(cfg, con, ns(), client=NoCalls())
 
-    assert len(fake.calls) == 2
-    files = sorted(p.name for p in _out(cfg).glob("*.md"))
-    assert files == ["DELTA REEL.md", "SONY HOLIDAY.md"]
-    text = (_out(cfg) / "DELTA REEL.md").read_text()
-    assert "## Hooks" in text
-    assert "10_DELTA REEL_00001.mp4" in text, "shot key must name the file export cuts"
+    files = sorted(p.name for p in (_out(cfg) / "prompts").glob("*.txt"))
+    assert files == ["DELTA REEL.txt", "SONY HOLIDAY.txt"]
+    assert not list(_out(cfg).glob("*.md")), "no copy is written without --api"
+    text = (_out(cfg) / "prompts" / "DELTA REEL.txt").read_text()
+    assert text.startswith(captions.VOICE), "one paste must carry the voice"
+    assert "EVENT: DELTA REEL" in text
 
 
-def test_brief_carries_human_verdict_and_never_a_path(env):
+def test_prompt_carries_human_verdict_and_never_a_path(env):
     cfg, con = env
-    fake = FakeClient()
-    captions.run(cfg, con, ns(), client=fake)
+    captions.run(cfg, con, ns(), client=NoCalls())
 
-    sent = "\n".join(c["messages"][0]["content"] for c in fake.calls)
-    assert "Miles 5/5" in sent and "Miles tags: hero shot" in sent
-    assert "road cases" not in sent, "a 2-star clip is below --min-rating 4"
-    assert "/Users/" not in sent and ".MOV" not in sent, "no paths leave the machine"
-    assert all(c["system"] == captions.VOICE for c in fake.calls)
+    text = "".join(p.read_text() for p in (_out(cfg) / "prompts").glob("*.txt"))
+    assert "Miles 5/5" in text and "Miles tags: hero shot" in text
+    assert "road cases" not in text, "a 2-star clip is below --min-rating 4"
+    assert "/Users/" not in text and ".MOV" not in text, "no paths in a prompt"
 
 
-def test_errored_clip_sends_tags_but_not_its_error_note(env):
+def test_errored_clip_keeps_tags_but_not_its_error_note(env):
     cfg, con = env
     con.execute("UPDATE clips SET note='overloaded_error 529' WHERE state='error'")
     con.commit()
-    fake = FakeClient()
-    captions.run(cfg, con, ns(event="sony holiday"), client=fake)
+    captions.run(cfg, con, ns(event="sony holiday"), client=NoCalls())
 
-    sent = fake.calls[0]["messages"][0]["content"]
-    assert "brand signage" in sent
-    assert "overloaded" not in sent
+    text = (_out(cfg) / "prompts" / "SONY HOLIDAY.txt").read_text()
+    assert "brand signage" in text
+    assert "overloaded" not in text
 
 
-def test_rerun_skips_events_that_already_have_copy(env):
+def test_prompts_follow_the_latest_ratings(env):
     cfg, con = env
-    fake = FakeClient()
-    captions.run(cfg, con, ns(), client=fake)
-    captions.run(cfg, con, ns(), client=fake)
-    assert len(fake.calls) == 2, "second run should have nothing to do"
-
-    captions.run(cfg, con, ns(force=True, event="DELTA REEL"), client=fake)
-    assert len(fake.calls) == 3
-
-
-def test_dry_run_sends_nothing_and_writes_nothing(env, capsys):
-    cfg, con = env
-    captions.run(cfg, con, ns(dry_run=True), client=NoCalls())
-    assert not _out(cfg).exists() or not list(_out(cfg).glob("*.md"))
-    out = capsys.readouterr().out
-    assert "EVENT: DELTA REEL" in out and "nothing sent" in out
-
-
-def test_a_bad_stop_writes_nothing_so_the_next_run_retries(env):
-    cfg, con = env
-    captions.run(cfg, con, ns(event="DELTA REEL"), client=FakeClient(stop="refusal"))
-    assert not (_out(cfg) / "DELTA REEL.md").exists()
-
-    fake = FakeClient()
-    captions.run(cfg, con, ns(event="DELTA REEL"), client=fake)
-    assert len(fake.calls) == 1
-    assert (_out(cfg) / "DELTA REEL.md").exists()
+    captions.run(cfg, con, ns(), client=NoCalls())
+    con.execute("UPDATE clips SET my_rating=5 WHERE note='road cases'")
+    con.commit()
+    captions.run(cfg, con, ns(), client=NoCalls())
+    assert "road cases" in (_out(cfg) / "prompts" / "DELTA REEL.txt").read_text()
 
 
 def test_unknown_event_is_refused(env):
     cfg, con = env
     with pytest.raises(SystemExit):
-        captions.run(cfg, con, ns(event="NOT AN EVENT"), client=FakeClient())
+        captions.run(cfg, con, ns(event="NOT AN EVENT"), client=NoCalls())
+
+
+# -- --api: the paid path ---------------------------------------------------
+
+
+def test_api_sends_exactly_what_the_prompt_file_holds(env):
+    cfg, con = env
+    fake = FakeClient()
+    captions.run(cfg, con, ns(api=True, event="DELTA REEL"), client=fake)
+
+    call = fake.calls[0]
+    sent = f"{call['system']}\n\n{call['messages'][0]['content']}\n"
+    assert sent == (_out(cfg) / "prompts" / "DELTA REEL.txt").read_text()
+    assert "## Hooks" in (_out(cfg) / "DELTA REEL.md").read_text()
+
+
+def test_api_skips_events_that_already_have_copy(env):
+    cfg, con = env
+    fake = FakeClient()
+    captions.run(cfg, con, ns(api=True), client=fake)
+    captions.run(cfg, con, ns(api=True), client=fake)
+    assert len(fake.calls) == 2, "second run should have nothing to send"
+
+    captions.run(cfg, con, ns(api=True, force=True, event="DELTA REEL"), client=fake)
+    assert len(fake.calls) == 3
+
+
+def test_api_bad_stop_writes_nothing_so_the_next_run_retries(env):
+    cfg, con = env
+    captions.run(cfg, con, ns(api=True, event="DELTA REEL"),
+                 client=FakeClient(stop="refusal"))
+    assert not (_out(cfg) / "DELTA REEL.md").exists()
+
+    fake = FakeClient()
+    captions.run(cfg, con, ns(api=True, event="DELTA REEL"), client=fake)
+    assert len(fake.calls) == 1
+    assert (_out(cfg) / "DELTA REEL.md").exists()
 
 
 def test_cli_wires_captions():
-    args = cli.build_parser().parse_args(
-        ["captions", "--crate", "--event", "DELTA REEL", "--dry-run"])
-    assert args.crate and args.dry_run and args.event == "DELTA REEL"
+    args = cli.build_parser().parse_args(["captions", "--crate", "--event", "DELTA REEL"])
+    assert args.crate and not args.api and args.event == "DELTA REEL"
+    assert cli.build_parser().parse_args(["captions", "--api"]).api
     assert cli.COMMANDS["captions"] is captions.run

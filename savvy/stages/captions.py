@@ -1,21 +1,26 @@
-"""Stage 7: draft Instagram copy per event from what the pipeline already knows.
+"""Stage 7: Instagram copy per event, from what the pipeline already knows.
 
-Text in, text out. Claude never sees footage here - only the event name and the
-tags, notes and ratings already in the database - so this costs cents per
-event, needs no drive mounted, and cannot trigger a Dropbox download.
+By default this calls nothing and costs nothing. It writes one prompt per event
+- the brand voice plus the shot list - for whichever AI Miles already pays for:
+paste it into Claude or ChatGPT, or have Claude Code or Codex work through the
+folder. `--api` sends the same text straight to Claude instead, which is billed
+per use on a separate API key.
 
-One markdown file per event under SELECTS/CAPTIONS. An event that already has a
-file is skipped, so a killed run picks up where it stopped.
+Either way only text is involved: the event name and the tags, notes and
+ratings already in the database. No footage, no paths, no drive needed, so it
+cannot trigger a Dropbox download.
 """
 import datetime
 import os
 
 from .. import config
 from ..voice import VOICE
-from .export import _safe, _select, clip_stem
+from .export import _safe, _select
 
 # The list is best-first; past this the tail adds tokens, not ideas.
 MAX_SHOTS = 30
+
+ID_NOTE = "Shot numbers match the end of each exported clip's filename."
 
 
 def _shot_line(row):
@@ -35,18 +40,14 @@ def _shot_line(row):
 
 
 def brief(event, rows):
-    """Everything that leaves the machine for one event. Never a path."""
+    """The event's shot list. Never a path."""
     return "\n".join([f"EVENT: {event}", f"SHOTS ({len(rows)}, best first):"]
                      + [_shot_line(r) for r in rows])
 
 
-def _shot_key(rows):
-    lines = ["| id | export file | yours | grader | tags |", "|---|---|---|---|---|"]
-    for r in rows:
-        tags = r["my_tags"] or r["tags"] or ""
-        lines.append(f"| {r['id']:05d} | {clip_stem(r)}.mp4 | {r['my_rating'] or ''}"
-                     f" | {r['score'] if r['score'] is not None else ''} | {tags} |")
-    return "\n".join(lines)
+def prompt(event, rows):
+    """One paste for any AI: exactly what --api sends as system + message."""
+    return f"{VOICE}\n\n{brief(event, rows)}\n"
 
 
 def _label(args):
@@ -71,7 +72,7 @@ def run(cfg, con, args, client=None):
     # The same selection export uses, so copy matches the clips you cut.
     sql, params, _ = _select(con, args)
     label = _label(args)
-    print(f"Drafting copy from {label}.")
+    print(f"Writing copy prompts from {label}.")
     events = {}
     for row in con.execute(sql, params).fetchall():
         events.setdefault(row["event"] or "misc", []).append(row)
@@ -86,26 +87,43 @@ def run(cfg, con, args, client=None):
         return
 
     out_dir = config.work_dir(cfg) / "SELECTS" / "CAPTIONS"
-    todo = []
+    prompt_dir = out_dir / "prompts"
+    prompt_dir.mkdir(parents=True, exist_ok=True)
+    jobs = []
     for event, rows in events.items():
-        path = out_dir / f"{_safe(event)}.md"
-        if path.exists() and not args.force:
+        rows = rows[:MAX_SHOTS]
+        name = _safe(event)
+        # Rewritten every run: it's free, and it should follow your latest ratings.
+        (prompt_dir / f"{name}.txt").write_text(prompt(event, rows))
+        print(f"  prompts/{name}.txt  ({len(rows)} shots)")
+        jobs.append((event, rows, out_dir / f"{name}.md"))
+
+    if not args.api:
+        print(f"\n{len(jobs)} prompts in {prompt_dir}\n"
+              "Paste one into Claude or ChatGPT, or ask Claude Code or Codex:\n"
+              '  "Follow each prompt in SELECTS/CAPTIONS/prompts and save the copy\n'
+              '   as SELECTS/CAPTIONS/<event name>.md"\n'
+              f"{ID_NOTE}")
+        return
+    _draft(cfg, jobs, label, args.force, client)
+
+
+def _draft(cfg, jobs, label, force, client):
+    """--api: send each prompt to Claude and save the answer. Billed per use."""
+    out_dir = config.work_dir(cfg) / "SELECTS" / "CAPTIONS"
+    todo = []
+    for event, rows, path in jobs:
+        if path.exists() and not force:
             print(f"  have {path.name}, skipping (--force to redo)")
             continue
-        todo.append((event, rows[:MAX_SHOTS], path))
-
-    if args.dry_run:
-        for event, rows, path in todo:
-            print(f"\n--- would send for {event} -> {path.name}\n{brief(event, rows)}")
-        print(f"\nDry run. {len(todo)} events, nothing sent.")
-        return
+        todo.append((event, rows, path))
     if not todo:
         print("Every selected event already has copy.")
         return
 
     client = client or _client()
-    out_dir.mkdir(parents=True, exist_ok=True)
-    print(f"Drafting copy for {len(todo)} events with {cfg['copy_model']}.")
+    print(f"\nDrafting {len(todo)} events with {cfg['copy_model']}, "
+          f"billed to your API key.")
     done, tok_in, tok_out = 0, 0, 0
     for i, (event, rows, path) in enumerate(todo, 1):
         try:
@@ -119,7 +137,7 @@ def run(cfg, con, args, client=None):
             continue
         tok_in += msg.usage.input_tokens
         tok_out += msg.usage.output_tokens
-        # Writing nothing on a bad stop leaves the event in todo for the next run.
+        # Writing nothing on a bad stop leaves the event to retry next run.
         if msg.stop_reason != "end_turn":
             print(f"  ! {event}: stopped on {msg.stop_reason}, nothing written")
             continue
@@ -128,8 +146,7 @@ def run(cfg, con, args, client=None):
         path.write_text(
             f"# {event}\n\n"
             f"Drafted {datetime.date.today().isoformat()} from {len(rows)} shots"
-            f" ({label}). Read it before you post it.\n\n"
-            f"{text}\n\n---\n\n## Shot key\n\n{_shot_key(rows)}\n")
+            f" ({label}). {ID_NOTE} Read it before you post it.\n\n{text}\n")
         done += 1
         print(f"  [{i}/{len(todo)}] {path.name}")
 

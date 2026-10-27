@@ -10,7 +10,7 @@ Context for Claude Code working in this repo. Each row maps a subject to the one
 | Owner | Miles DiPaola, founder of Savvy Sounds Collective, a DJ and event-production company in Los Angeles. |
 | The immediate goal | A corporate capabilities reel plus ad creative aimed at event producers and brand agencies. |
 | Where it runs | Everything runs on his Mac. |
-| Footage | Never leaves the machine except single downsampled JPEG contact strips sent to the Anthropic API during `score`. `captions` sends text only: event names plus the tags, notes and ratings already in the database, never a path or a frame. |
+| Footage | Never leaves the machine except single downsampled JPEG contact strips sent to the Anthropic API during `score`. `captions` sends nothing by default: it writes prompt files holding only event names plus the tags, notes and ratings already in the database, never a path or a frame. Only `captions --api` sends that text to the Anthropic API. |
 
 ## Architecture
 
@@ -29,7 +29,7 @@ Context for Claude Code working in this repo. Each row maps a subject to the one
 | `score` | Claude vision grades contact strips. PAID. |
 | `review` | Local web deck, human rates and tags. Local, free. |
 | `export` | Cut winners from ORIGINALS. Local, free. |
-| `captions` | Claude drafts Instagram copy per event from tags and ratings. Text only, no footage. PAID, cents per event. |
+| `captions` | One Instagram copy prompt per event from tags and ratings. Free: Miles pastes it into an AI he already pays for. `--api` sends it to Claude instead, PAID. |
 
 ## Architecture — the files
 
@@ -81,7 +81,7 @@ Context for Claude Code working in this repo. Each row maps a subject to the one
 | `savvy export --use-ratings --min-rating 4` | — |
 | `savvy export --crate` | — |
 | `savvy assemble --track "/path/to/track.mp3"` | Beat-synced rough cut EDL. |
-| `savvy captions --use-ratings --min-rating 4 [--event "NAME"] [--dry-run]` | Instagram copy per event into `SELECTS/CAPTIONS`. Same selection flags as export. |
+| `savvy captions --use-ratings --min-rating 4 [--event "NAME"] [--api]` | Copy prompts into `SELECTS/CAPTIONS/prompts`; `--api` also drafts the copy, paid. Same selection flags as export. |
 | `savvy status` | — |
 | `SAVVY_CONFIG=/path/to/other.json` | Overrides which config file is loaded, which is how the tests and smoke runs stay isolated. |
 
@@ -96,13 +96,14 @@ Context for Claude Code working in this repo. Each row maps a subject to the one
 | Comments | Explain *why*, not *what*. Skip the ones that restate the code. |
 | Every stage | Prints progress as it goes. Long silent runs feel broken. |
 | Tests | Use synthetic ffmpeg-generated footage and never require an API key or network access. |
+| Caption prompts | When Miles asks for the copy, follow each `work_dir/SELECTS/CAPTIONS/prompts/<event>.txt` and save the answer as `work_dir/SELECTS/CAPTIONS/<event>.md`. Never overwrite an existing `.md` without asking. |
 
 ## Tuning the grader
 
 | Subject | Rule |
 |---|---|
 | `savvy/rubric.py` | Where taste lives. |
-| `savvy/voice.py` | Where the brand voice lives. Fix bad copy here and re-run one event with `--force`, not by hand-editing drafts. |
+| `savvy/voice.py` | Where the brand voice lives. Fix bad copy here and regenerate the prompts, not by hand-editing drafts. |
 | The loop | Review clips, run `savvy calibrate`, read which tags the grader over- and under-rates, edit the rubric, re-run `score`. |
 | Guessing | Do not tune it by guessing — use the calibrate output. |
 
