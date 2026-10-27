@@ -7,6 +7,7 @@
   "work_dir": "/Users/miles/SavvySelects",
   "hwaccel": true,
   "model": "claude-sonnet-5",
+  "copy_model": "claude-opus-5-5",
   "sharpness_floor": 45.0,
   "scene_threshold": 0.30,
   "min_clip_seconds": 2.0,

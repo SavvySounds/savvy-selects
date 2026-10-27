@@ -10,7 +10,8 @@ and hands you trimmed clips cut from the original files at full quality.
 Then you audit the results in a local review deck — play, rate, advance, the way
 you'd go through a crate — and export what you picked.
 
-Nothing leaves your machine except downsampled contact strips during grading.
+Nothing leaves your machine except downsampled contact strips during grading,
+and the event names and tags `captions` writes copy from.
 
 ## Setup
 
@@ -49,6 +50,7 @@ savvy score --limit 200          # the only paid stage
 savvy review                     # rate them yourself
 savvy export --use-ratings --min-rating 4
 savvy assemble --track "/path/to/track.mp3"  # beat-synced rough cut EDL
+savvy captions --use-ratings --min-rating 4  # Instagram copy per event
 ```
 
 Every stage is resumable. Close the laptop, plug the drive back in tomorrow, run
@@ -129,6 +131,16 @@ crate. The output is a CMX3600 EDL — plain text that references your original
 files, importable into Premiere, Resolve, or Avid. No render, no new footage.
 If you know the tempo, `--bpm` and `--offset` skip the guesswork entirely.
 
+**captions** drafts the Instagram copy for each event: five hooks and a pick,
+a shot order with on-screen text, three captions (story, proof, point of
+view), hashtags, and a fifteen-second ad cut. It reads only the tags, notes
+and ratings already in the database, so no drive needs to be mounted and no
+footage is sent. Give it the same flags you exported with and the copy
+matches the clips you cut; the shot key at the bottom of each file maps ids
+to export filenames. The voice lives in `savvy/voice.py` — edit it like a
+copywriter's brief, then `--event "NAME" --force` to redo one event.
+`--dry-run` prints exactly what would be sent. A few cents per event.
+
 ## Output
 
 ```
@@ -136,6 +148,7 @@ If you know the tempo, `--bpm` and `--offset` skip the guesswork entirely.
     16x9/         10_DELTA_REEL_00341.mp4     <- filename leads with the rating
     9x16/         10_DELTA_REEL_00341.mp4
     catalog.csv   your rating, grader score, tags, source file, timecode
+    CAPTIONS/     DELTA REEL.md               <- hooks, shot order, captions, ad cut
 ```
 
 Sort by name and the best material is at the top. The CSV makes the whole archive

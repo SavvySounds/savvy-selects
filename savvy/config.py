@@ -18,6 +18,7 @@ DEFAULTS = {
     "brightness_floor": 28.0,
     "brightness_ceiling": 242.0,
     "model": "claude-sonnet-5",
+    "copy_model": "claude-opus-5-5",
     "export_vertical": True,
 }
 
