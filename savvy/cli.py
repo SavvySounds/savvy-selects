@@ -6,7 +6,7 @@ import sys
 from . import config, db, storage
 from .review import calibrate as _calibrate
 from .review import serve
-from .stages import assemble, export, fetch, proxy, scan, score
+from .stages import assemble, export, fetch, proxy, scan, score, watch
 
 
 def status(cfg, con, args):
@@ -110,6 +110,19 @@ def build_parser():
     c = sub.add_parser("calibrate", help="report where you and the grader disagree")
     c.add_argument("--min-samples", type=int, default=20)
 
+    w = sub.add_parser("watch", help="have Gemini watch one video, sound and all "
+                                     "(paid, sends a 720p copy to Google)")
+    w.add_argument("video", help="one video file, or a public YouTube URL")
+    w.add_argument("--mode", choices=list(watch.MODES), default="report",
+                   help="report: what's in it. teardown: how an ad or reel is "
+                        "built. selects: the usable moments in raw footage")
+    w.add_argument("--ask", help="your own question instead of a preset report")
+    w.add_argument("--start", help="only send from here, e.g. 1:30")
+    w.add_argument("--end", help="only send up to here, e.g. 4:00")
+    w.add_argument("--fps", type=float, help="frames per second Gemini looks at "
+                                             "(default 1, teardown 2)")
+    w.add_argument("--model", help="Gemini model id (default: gemini_model in config)")
+
     sub.add_parser("status", help="counts by stage")
     return ap
 
@@ -117,7 +130,7 @@ def build_parser():
 COMMANDS = {"check": check, "fetch": fetch.run, "proxy": proxy.run,
             "scan": scan.run, "score": score.run, "export": export.run,
             "assemble": assemble.run, "review": serve, "calibrate": _calibrate,
-            "status": status}
+            "watch": watch.run, "status": status}
 
 
 def main(argv=None):

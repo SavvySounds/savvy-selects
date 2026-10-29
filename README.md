@@ -10,7 +10,8 @@ and hands you trimmed clips cut from the original files at full quality.
 Then you audit the results in a local review deck — play, rate, advance, the way
 you'd go through a crate — and export what you picked.
 
-Nothing leaves your machine except downsampled contact strips during grading.
+Nothing leaves your machine except downsampled contact strips during grading,
+and the one video you hand to `savvy watch`.
 
 ## Setup
 
@@ -49,6 +50,7 @@ savvy score --limit 200          # the only paid stage
 savvy review                     # rate them yourself
 savvy export --use-ratings --min-rating 4
 savvy assemble --track "/path/to/track.mp3"  # beat-synced rough cut EDL
+savvy watch "/path/to/clip.mp4"  # Gemini watches one video, sound included
 ```
 
 Every stage is resumable. Close the laptop, plug the drive back in tomorrow, run
@@ -140,6 +142,40 @@ If you know the tempo, `--bpm` and `--offset` skip the guesswork entirely.
 
 Sort by name and the best material is at the top. The CSV makes the whole archive
 searchable — filter for "packed floor", "rooftop", "brand signage".
+
+## Watching a video
+
+Claude can look at frames but can't sit through a video with its sound. Gemini
+can. `savvy watch` hands it one video and saves what it saw:
+
+```bash
+savvy watch "/path/to/clip.mp4"                       # what's in it, transcript, key moments
+savvy watch "/path/to/competitor-ad.mp4" --mode teardown   # hook, pacing, text, the ask
+savvy watch "/path/to/raw-set.mov" --mode selects --start 10:00 --end 25:00
+savvy watch "https://www.youtube.com/watch?v=..." --ask "When does the crowd peak?"
+```
+
+`teardown` measures the real cuts locally and hands Gemini the list, so shot
+counts and lengths are exact rather than guessed. `selects` judges footage by
+the same taste as the grader in `savvy/rubric.py`, and returns in/out points.
+
+Reports land in `~/SavvySelects/watch/`. What gets sent is a 720p copy, trimmed
+to your range, and it's deleted from Google as soon as the answer comes back.
+Online-only Dropbox files are refused, same as everywhere else.
+
+Setup, once:
+
+```bash
+export GEMINI_API_KEY="..."   # from aistudio.google.com/apikey, add to ~/.zshrc
+make skill                    # optional: /watch in every Claude Code session
+```
+
+Use a key from a Google Cloud project with billing turned on before you send
+client footage. On the free tier, Google's terms let it use what you upload to
+improve its models, and people may review it. On the paid tier it doesn't.
+
+Inside Claude Code you don't have to remember any of this: ask "what happens in
+this clip?" or "break down this ad" with a file path and the /watch skill runs it.
 
 ## Teaching it your taste
 

@@ -18,6 +18,9 @@ DEFAULTS = {
     "brightness_floor": 28.0,
     "brightness_ceiling": 242.0,
     "model": "claude-sonnet-5",
+    # Alias that follows Google's current Flash model; pin an exact id here
+    # if a new release changes how reports read.
+    "gemini_model": "gemini-flash-latest",
     "export_vertical": True,
 }
 

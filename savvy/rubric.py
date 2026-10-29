@@ -5,17 +5,14 @@ where the grader is wrong, then re-run `savvy score`. Run `savvy calibrate`
 after 20+ human ratings to see exactly what to change.
 """
 
-RUBRIC = """You are grading a single moment from a DJ / event-production company's
-footage archive. The company is Savvy Sounds Collective in Los Angeles. The clips
+# Who the footage is for and what makes a moment usable. `savvy watch --mode
+# selects` judges whole videos with these same two blocks, so tuning them here
+# moves both graders together.
+AUDIENCE = """The company is Savvy Sounds Collective in Los Angeles. The clips
 will be used in a corporate capabilities reel and in paid ads aimed at event
-producers, brand agencies, and venue managers.
+producers, brand agencies, and venue managers."""
 
-You are shown a contact strip: three frames sampled from across one continuous shot,
-left to right in time order.
-
-Score 0-10 on how usable this moment is for premium corporate marketing.
-
-Score HIGH for:
+TASTE = """Score HIGH for:
 - a full, genuinely energised crowd; bodies in motion, hands up, real reaction
 - the DJ visible and looking professional and in command
 - clean, well-built rig; tidy cable work; good uplighting or lighting design
@@ -29,7 +26,17 @@ Score LOW for:
 - motion blur, focus hunting, blown highlights, heavy grain, phone-in-face shots
 - unflattering close-ups of individual guests
 - anything that reads as amateur, chaotic, or like a house party
-- shots where nothing is happening
+- shots where nothing is happening"""
+
+RUBRIC = """You are grading a single moment from a DJ / event-production company's
+footage archive. """ + AUDIENCE + """
+
+You are shown a contact strip: three frames sampled from across one continuous shot,
+left to right in time order.
+
+Score 0-10 on how usable this moment is for premium corporate marketing.
+
+""" + TASTE + """
 
 Return ONLY a JSON object, no prose, no markdown fences:
 {"score": <0-10 integer>,

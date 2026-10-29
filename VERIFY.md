@@ -37,9 +37,10 @@ again.
 
 **Your footage is never written to.** No part of this tool moves, renames,
 deletes, or edits anything inside a folder listed under `sources` in
-`config.json`. The only two things that ever open an original file are the
-final cut in `export` (reads it) and `fetch` (reads it to pull it down from
-Dropbox). Everything else works off the file's name and size only.
+`config.json`. The only things that ever open an original file are the final
+cut in `export` (reads it), `fetch` (reads it to pull it down from Dropbox) and
+`watch` (reads the one file you name to make its upload copy). Everything else
+works off the file's name and size only.
 
 **Most of your archive is not on this Mac.** As measured on 2026-08-27:
 
@@ -92,14 +93,14 @@ cd ~/savvy-selects && make test
 
 **Proving it works.**
 
-1. Run it. It ends `42 passed`.
+1. Run it. It ends `75 passed` (as of 2026-10-29).
 2. Prove the tests are actually reading this code and not something stale.
    Open `savvy/media.py`, find the line `return float(lap.var())` at the end of
    `laplacian_variance`, and change it to `return 9999.0`.
 3. Run `make test` again. It must FAIL, and the failures must name
    `test_laplacian_separates_sharp_from_blurred` and
    `test_scan_rejects_black_and_blurred_shots`.
-4. Put the line back and confirm `42 passed` again.
+4. Put the line back and confirm `75 passed` again.
 
 Seen red 2026-08-27: `2 failed, 37 passed`. That's what "the tests are wired to
 the real code" looks like. A suite that stays green through step 2 is reading
@@ -417,6 +418,55 @@ name puts the best material on top.
 
 ---
 
+## `savvy watch` — Gemini watches one video, sound and all
+
+**What it is.** Makes a 720p copy of one video (trimmed to `--start`/`--end` if
+given), uploads it to Google's Gemini API, asks for a report, deletes the
+upload, and saves the report to `work_dir/watch/`. The /watch skill
+(`.claude/skills/watch/`) is how Claude Code uses it. **This is the one command
+that sends video off the Mac, and it sends it to Google, not Anthropic.** It is
+paid.
+
+**How to run it.**
+
+```bash
+export GEMINI_API_KEY="..."          # aistudio.google.com/apikey
+.venv/bin/savvy watch "/path/to/clip.mp4"
+.venv/bin/savvy watch "/path/to/ad.mp4" --mode teardown
+.venv/bin/savvy watch "/path/to/raw.mov" --mode selects --start 2:00 --end 6:00
+```
+
+**Proving it works.**
+
+1. With no key set, it must refuse before touching the file:
+   `Set GEMINI_API_KEY first.`
+2. **Against a real parked file: it must refuse to open a Dropbox
+   placeholder.** Point it at a file `savvy check` counts as in the cloud. It
+   must print `is online-only in Dropbox; opening it would download it` and the
+   file must still be parked afterwards (`0 blocks`, free space unchanged). The
+   test that covers this (`test_cloud_placeholder_is_never_opened`) swaps
+   ffmpeg for a stand-in that fails if called.
+3. Only a small copy goes up, never the original, and nothing is written next
+   to the source (`test_sends_a_small_copy_never_the_original`: the upload is
+   720p, has audio, lives in `work_dir`, and the source folder's listing is
+   byte-for-byte unchanged).
+4. The upload is deleted from Google afterwards, including when the question
+   fails (`test_remote_copy_is_deleted_even_when_the_question_fails`).
+5. **The first real run:** a short clip, then look at the report. Every
+   timestamp you spot-check should land on what it describes. Any speaker name
+   or brand it mentions should actually be on screen or audible. If it invents
+   one, tighten `GROUND_RULES` in `stages/watch.py`.
+
+Seen red 2026-10-29, each guard broken on purpose and caught: disarming the
+placeholder check (1 failed), uploading the original instead of the copy
+(2 failed), skipping the delete (2 failed), dropping the measured cut list
+from teardowns (1 failed).
+
+**Not proven automatically.** No test calls the real Gemini API. Step 5 is the
+check, and it's a human one.
+
+---
+
 ## `savvy status` — where things stand
 
 **What it is.** Counts by stage. The first thing to run when something feels
@@ -455,7 +505,7 @@ new writer appears.
 
 | The lasting thing | Who writes it | Verdict |
 |---|---|---|
-| **Your footage** under `sources` | **nobody** | ✅ Clean. Nothing writes, renames or deletes source files. Two places only *read* an original: `media.py:123 cut()` and `storage.py:87 materialize()`. |
+| **Your footage** under `sources` | **nobody** | ✅ Clean. Nothing writes, renames or deletes source files. Three places only *read* an original: `media.py:149 cut()`, `media.py:171 watch_copy()` and `storage.py:87 materialize()`. |
 | **`config.json`** (your folder paths) | **nobody in the code** — `config.py:31 load()` only reads it | ⚠️ **Violated once, by a tool.** See below. |
 | **`selects.db` → `media` table** | `stages/proxy.py:41,49,59,63,79,86,95,98`; `stages/fetch.py:74,80,92`; `stages/scan.py:19,52` | ⚠️ **Three writers.** Documented, not restructured. |
 | **`selects.db` → `clips` table** | `stages/scan.py:47`; `stages/score.py:39,58,62`; `stages/export.py:73`; `review/server.py:135` | ⚠️ **Four writers**, but cleanly split by column — see below. |
@@ -464,6 +514,7 @@ new writer appears.
 | **Small copies** `work_dir/proxies/*.mp4` | `stages/proxy.py:91` | ✅ Clean. |
 | **Filmstrips** `work_dir/filmstrips/*.jpg` | `media.py:80 filmstrip()`, called only from `review/server.py:101` | ✅ Clean. |
 | **Exported clips + `catalog.csv`** | `stages/export.py:65,70,88` | ✅ Clean. |
+| **Watch reports** `work_dir/watch/*.md` | `stages/watch.py` only; its upload copy is deleted on the way out | ✅ Clean. Writes no database table. |
 
 **On the `media` and `clips` tables.** Four stages writing one table breaks the
 rule by the letter. In practice each one owns a different column and a different
@@ -549,6 +600,8 @@ above has caught a real problem.**
 
 - `score` spends money and is never scheduled. It runs with `--limit`, watched,
   every time.
+- `watch` spends money and sends footage to Google. One file, run by hand, every
+  time. Never in a loop.
 - `fetch` downloads footage onto a drive with 28 GB free. It runs with
   `--dry-run` first, watched, every time.
 - `export` writes clips and reads originals. It runs watched until rung 3 is

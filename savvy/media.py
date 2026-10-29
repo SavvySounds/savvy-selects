@@ -160,3 +160,33 @@ def cut(src, start, end, out, vf=None, hw=True, bitrate="12000k"):
     r = run(base + ["-c:v", "libx264", "-crf", "18", "-preset", "medium"]
             + tail + [str(out)])
     return r.returncode == 0, r.stderr[-300:]
+
+
+# Short side to 720, never upscaled, rounded to even so libx264 accepts it.
+# Works for 9:16 phone footage too, where a fixed height would crush the width.
+_WATCH_SCALE = ("scale='if(gt(iw,ih),-2,trunc(min({h},iw)/2)*2)'"
+                ":'if(gt(iw,ih),trunc(min({h},ih)/2)*2,-2)'")
+
+
+def watch_copy(src, out, start=None, end=None, height=720, hw=True):
+    """Small upload copy of one video for `savvy watch`. Reads the original.
+
+    Unlike proxies this keeps the audio, mono and speech-grade, because the
+    transcript is half of what the watcher is for. Trimming happens here so only
+    the asked-for range ever leaves the machine.
+    """
+    base = ["ffmpeg", "-v", "error", "-y"]
+    if start:
+        base += ["-ss", f"{start:.3f}"]
+    if end:
+        base += ["-to", f"{end:.3f}"]
+    base += ["-i", str(src), "-vf", _WATCH_SCALE.format(h=height),
+             "-map", "0:v:0", "-map", "0:a:0?"]
+    tail = ["-c:a", "aac", "-b:a", "64k", "-ac", "1",
+            "-movflags", "+faststart", str(out)]
+    if hw:
+        r = run(base + ["-c:v", "h264_videotoolbox", "-b:v", "1500k"] + tail)
+        if r.returncode == 0 and Path(out).exists():
+            return True, ""
+    r = run(base + ["-c:v", "libx264", "-crf", "30", "-preset", "veryfast"] + tail)
+    return r.returncode == 0, r.stderr[-300:]

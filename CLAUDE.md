@@ -10,7 +10,7 @@ Context for Claude Code working in this repo. Each row maps a subject to the one
 | Owner | Miles DiPaola, founder of Savvy Sounds Collective, a DJ and event-production company in Los Angeles. |
 | The immediate goal | A corporate capabilities reel plus ad creative aimed at event producers and brand agencies. |
 | Where it runs | Everything runs on his Mac. |
-| Footage | Never leaves the machine except single downsampled JPEG contact strips sent to the Anthropic API during `score`. |
+| Footage | Never leaves the machine except single downsampled JPEG contact strips sent to the Anthropic API during `score`, and a 720p copy of one video per run sent to Google's Gemini API by `savvy watch`, only when run by hand. |
 
 ## Architecture
 
@@ -40,13 +40,15 @@ Context for Claude Code working in this repo. Each row maps a subject to the one
 | `savvy/beatgrid.py` | BPM/beat detection and the beat grid. |
 | `savvy/edl.py` | CMX3600 EDL writer. |
 | `savvy/media.py` | Every ffmpeg/PIL call in the codebase. |
-| `savvy/rubric.py` | RUBRIC prompt — this file is the product's taste. |
-| `savvy/stages/` | proxy, scan, score, export, assemble. |
+| `savvy/rubric.py` | RUBRIC prompt, built from the AUDIENCE and TASTE blocks that `watch --mode selects` also uses — this file is the product's taste. |
+| `savvy/gemini.py` | Stdlib Gemini API client: upload a video, ask about it, delete it. |
+| `savvy/stages/` | proxy, scan, score, export, assemble, watch. |
 | `savvy/review/server.py` | Stdlib HTTP server, JSON + byte-range media API. |
 | `savvy/review/index.html` | The review deck UI. |
 | `savvy/review/calibrate.py` | Human vs grader disagreement report. |
 | `savvy/cli.py` | argparse entry point → `savvy <stage>`. |
 | `tests/` | pytest, synthetic footage, no API key needed. |
+| `.claude/skills/watch/` | The /watch skill: tells Claude when and how to run `savvy watch`. |
 
 ## Invariants — do not break these
 
@@ -62,6 +64,7 @@ Context for Claude Code working in this repo. Each row maps a subject to the one
 | 7. All ffmpeg calls live in `media.py`. | Stages should not shell out directly. |
 | 8. VideoToolbox is attempted first, libx264 is the fallback. | Apple Silicon gets hardware encode; CI and Linux quietly fall back. Never assume either. |
 | 9. EDL timecodes always reference original sources, never proxies or exported cuts. | `assemble` reads shot ranges off proxies but writes in/out points on the ORIGINAL files at each original's own frame rate, so the EDL relinks cleanly in Premiere/Resolve/Avid. |
+| 10. `watch` sends one file per run, as a small copy, and cleans up after. | It is the only path that sends video off the Mac, and it goes to Google rather than Anthropic. It takes a single file, never a folder; uploads a 720p copy built in `work_dir` and trimmed to `--start`/`--end`, never the original; checks invariants 3, 4 and 4b before anything opens the file; and deletes the upload from Google once answered. A batch mode would change both the spend and who sees the footage, so it is Miles's call, not a refactor. |
 
 ## Commands
 
@@ -80,6 +83,8 @@ Context for Claude Code working in this repo. Each row maps a subject to the one
 | `savvy export --crate` | — |
 | `savvy assemble --track "/path/to/track.mp3"` | Beat-synced rough cut EDL. |
 | `savvy status` | — |
+| `savvy watch "/path/clip.mp4" --mode teardown` | Gemini watches one video with its sound and writes a timestamped report to `work_dir/watch/`. Modes: `report` (default), `teardown`, `selects`; or `--ask "..."`. PAID, sends a 720p copy to Google, needs `GEMINI_API_KEY`. |
+| `make skill` | Symlinks the /watch skill into `~/.claude/skills` so it works in every Claude Code session. |
 | `SAVVY_CONFIG=/path/to/other.json` | Overrides which config file is loaded, which is how the tests and smoke runs stay isolated. |
 
 ## Conventions
@@ -87,7 +92,7 @@ Context for Claude Code working in this repo. Each row maps a subject to the one
 | Subject | Rule |
 |---|---|
 | Python | 3.11+, standard library first. |
-| Third-party deps | Current: `anthropic`, `numpy`, `pillow`, `mutagen` — adding another needs a reason. |
+| Third-party deps | Current: `anthropic`, `numpy`, `pillow`, `mutagen` — adding another needs a reason. That is why Gemini is called over stdlib `urllib` in `gemini.py` instead of through Google's SDK. |
 | OpenCV | No OpenCV: the sharpness metric is a hand-rolled Laplacian in numpy specifically to avoid that install. |
 | The review UI | One HTML file with inline CSS and vanilla JS. No build step, no framework, no npm. Keep it that way. |
 | Comments | Explain *why*, not *what*. Skip the ones that restate the code. |
@@ -101,6 +106,7 @@ Context for Claude Code working in this repo. Each row maps a subject to the one
 | `savvy/rubric.py` | Where taste lives. |
 | The loop | Review clips, run `savvy calibrate`, read which tags the grader over- and under-rates, edit the rubric, re-run `score`. |
 | Guessing | Do not tune it by guessing — use the calibrate output. |
+| `watch --mode selects` | Judges whole videos by the same AUDIENCE and TASTE blocks as the grader, so a rubric edit moves both. Keep `RUBRIC` built from them. |
 
 ## Backlog
 
