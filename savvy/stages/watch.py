@@ -211,16 +211,19 @@ def run(cfg, con, args):
     try:
         if YOUTUBE.match(args.video):
             # Gemini fetches public YouTube videos itself; nothing is uploaded.
+            # Share links carry tracking params (?si=, ?is=) and come as
+            # youtu.be; send the plain watch URL instead.
             m = YOUTUBE_ID.search(args.video)
-            source, name = args.video, "youtube-" + (m.group(1) if m else stamp)
+            url = f"https://www.youtube.com/watch?v={m.group(1)}" if m else args.video
+            source, name = url, "youtube-" + (m.group(1) if m else stamp)
             cuts = None
             fps = args.fps or MODES[mode]
             if start:
                 video_meta["startOffset"] = f"{start:g}s"
             if end:
                 video_meta["endOffset"] = f"{end:g}s"
-            part = {"fileData": {"fileUri": args.video}}
-            print(f"Asking {model} about {args.video}")
+            part = {"fileData": {"fileUri": url}}
+            print(f"Asking {model} about {url}")
         else:
             path = Path(args.video).expanduser().resolve()
             _refuse_if_unwatchable(path, cfg)

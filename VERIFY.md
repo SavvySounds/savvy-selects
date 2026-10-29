@@ -93,14 +93,14 @@ cd ~/savvy-selects && make test
 
 **Proving it works.**
 
-1. Run it. It ends `75 passed` (as of 2026-10-29).
+1. Run it. It ends `76 passed` (as of 2026-10-29).
 2. Prove the tests are actually reading this code and not something stale.
    Open `savvy/media.py`, find the line `return float(lap.var())` at the end of
    `laplacian_variance`, and change it to `return 9999.0`.
 3. Run `make test` again. It must FAIL, and the failures must name
    `test_laplacian_separates_sharp_from_blurred` and
    `test_scan_rejects_black_and_blurred_shots`.
-4. Put the line back and confirm `75 passed` again.
+4. Put the line back and confirm `76 passed` again.
 
 Seen red 2026-08-27: `2 failed, 37 passed`. That's what "the tests are wired to
 the real code" looks like. A suite that stays green through step 2 is reading

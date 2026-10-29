@@ -263,6 +263,12 @@ def test_youtube_is_passed_by_url_and_nothing_is_uploaded(cfg, fake):
     assert out.name.startswith("youtube-dQw4w9-gXcQ-")
 
 
+def test_youtube_share_link_is_sent_as_a_plain_watch_url(cfg, fake):
+    watch.run(cfg, None, ns(video="https://youtu.be/QLLuZbuTIRc?is=5Pk-w6XZIcL4F35o"))
+    part = fake.instances[0].calls[0][1][0]
+    assert part["fileData"]["fileUri"] == "https://www.youtube.com/watch?v=QLLuZbuTIRc"
+
+
 # --------------------------------------------------------------------------
 # helpers
 
